@@ -1,0 +1,19 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "client/dist",
+    "rewrites": [
+      {
+        "source": "/ical/**",
+        "function": "exportIcal",
+        "region": "asia-southeast1"
+      }
+    ]
+  }
+}
