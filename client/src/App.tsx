@@ -1,7 +1,9 @@
 import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
+import { FileText } from 'lucide-react'
 import PrivateRoute from './components/PrivateRoute'
 import DashboardPage from './pages/DashboardPage'
 import FinancePage from './pages/FinancePage'
+import InvoicePage from './pages/InvoicePage'
 import LoginPage from './pages/LoginPage'
 
 function PrivateLayout() {
@@ -35,6 +37,19 @@ function PrivateLayout() {
             >
               Tài chính
             </NavLink>
+            <NavLink
+              to="/invoices"
+              className={({ isActive }) =>
+                `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              <FileText className="h-4 w-4" />
+              Hóa đơn
+            </NavLink>
           </div>
         </header>
 
@@ -51,6 +66,7 @@ function App() {
       <Route element={<PrivateLayout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/finance" element={<FinancePage />} />
+        <Route path="/invoices" element={<InvoicePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

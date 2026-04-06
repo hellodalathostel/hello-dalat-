@@ -1,8 +1,10 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
-import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useEffect, useMemo, useState } from 'react'
 import { db } from '../../firebase'
-import type { Booking, ServiceItem } from '../../types'
+import type { Booking, Guest, Room, ServiceItem } from '../../types'
+import { generateConfirmation } from '../../utils/generateConfirmation'
+import { generateDepositRequest } from '../../utils/generateDepositRequest'
 
 const roomOptions = [
   { value: '101', label: '101 - Family' },
@@ -216,11 +218,23 @@ export default function BookingForm({
   )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [generatingDoc, setGeneratingDoc] = useState<null | 'deposit' | 'confirmation'>(null)
+  const [showDepositDialog, setShowDepositDialog] = useState(false)
+  const [depositRequestAmount, setDepositRequestAmount] = useState(0)
 
   useEffect(() => {
     setFormState(getInitialFormState(booking, defaultRoomId, defaultDate))
     setError(null)
   }, [booking, defaultDate, defaultRoomId])
+
+  useEffect(() => {
+    if (!booking) {
+      return
+    }
+
+    const defaultAmount = booking.roomRate > 0 ? booking.roomRate : 100000
+    setDepositRequestAmount(defaultAmount)
+  }, [booking])
 
   const nights = useMemo(
     () => getNights(formState.checkIn, formState.checkOut),
@@ -426,6 +440,105 @@ export default function BookingForm({
       setError('Không thể lưu booking. Vui lòng thử lại.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function fetchRoomForBooking(targetBooking: Booking): Promise<Room> {
+    const roomDoc = await getDoc(doc(db, 'rooms', targetBooking.roomId))
+
+    if (roomDoc.exists()) {
+      const roomData = roomDoc.data() as Partial<Room>
+      return {
+        id: roomDoc.id,
+        number: roomData.number || targetBooking.roomId,
+        type: roomData.type || 'standard_double',
+        typeLabel: roomData.typeLabel || 'Standard Double',
+        bedConfig: roomData.bedConfig || '',
+        capacity: roomData.capacity || 2,
+        floor: roomData.floor || 1,
+        icalUrl: roomData.icalUrl ?? null,
+        amenities: roomData.amenities || [],
+        isActive: roomData.isActive ?? true,
+      }
+    }
+
+    return {
+      id: targetBooking.roomId,
+      number: targetBooking.roomId,
+      type: 'standard_double',
+      typeLabel: 'Standard Double',
+      bedConfig: '',
+      capacity: 2,
+      floor: 1,
+      icalUrl: null,
+      amenities: [],
+      isActive: true,
+    }
+  }
+
+  function getBookingGuests(targetBooking: Booking): Guest[] {
+    if (Array.isArray(targetBooking.guests) && targetBooking.guests.length > 0) {
+      return targetBooking.guests
+    }
+
+    return [
+      {
+        id: targetBooking.id,
+        fullName: targetBooking.guestName || 'Guest',
+        phone: targetBooking.guestPhone || '',
+        email: targetBooking.guestEmail || '',
+        nationality: targetBooking.nationality || 'VN',
+        idType: 'other',
+        idNumber: '',
+        dateOfBirth: '',
+        gender: 'other',
+        bookingHistory: [targetBooking.id],
+      },
+    ]
+  }
+
+  async function handleGenerateDepositRequest() {
+    if (!booking || generatingDoc) {
+      return
+    }
+
+    setGeneratingDoc('deposit')
+    setError(null)
+
+    try {
+      const room = await fetchRoomForBooking(booking)
+      const guests = getBookingGuests(booking)
+      const bookingForPdf: Booking = {
+        ...booking,
+        depositPaid: depositRequestAmount,
+      }
+      await generateDepositRequest(bookingForPdf, guests, room)
+      setShowDepositDialog(false)
+    } catch (documentError) {
+      console.error(documentError)
+      setError('Khong the tao PDF yeu cau dat coc.')
+    } finally {
+      setGeneratingDoc(null)
+    }
+  }
+
+  async function handleGenerateConfirmation() {
+    if (!booking || generatingDoc) {
+      return
+    }
+
+    setGeneratingDoc('confirmation')
+    setError(null)
+
+    try {
+      const room = await fetchRoomForBooking(booking)
+      const guests = getBookingGuests(booking)
+      await generateConfirmation(booking, guests, room)
+    } catch (documentError) {
+      console.error(documentError)
+      setError('Khong the tao PDF xac nhan dat phong.')
+    } finally {
+      setGeneratingDoc(null)
     }
   }
 
@@ -823,6 +936,34 @@ export default function BookingForm({
         </p>
       ) : null}
 
+      {booking ? (
+        <section className="space-y-3 rounded-xl border border-primary/15 bg-[#faf8f1] px-3 py-3">
+          <p className="text-sm font-semibold text-slate-800">Tai lieu</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDepositDialog(true)}
+              disabled={Boolean(generatingDoc)}
+              title={generatingDoc ? 'Dang tao PDF...' : 'Tao phieu yeu cau dat coc'}
+              className="rounded-xl border border-primary px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {generatingDoc === 'deposit' ? 'Dang tao PDF...' : 'Yeu cau dat coc'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleGenerateConfirmation()
+              }}
+              disabled={Boolean(generatingDoc)}
+              title={generatingDoc ? 'Dang tao PDF...' : 'Tao phieu xac nhan dat phong'}
+              className="rounded-xl border border-primary px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {generatingDoc === 'confirmation' ? 'Dang tao PDF...' : 'Xac nhan dat phong'}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-100 bg-white/90 pt-4 backdrop-blur">
         <button
           type="button"
@@ -840,6 +981,50 @@ export default function BookingForm({
           {submitting ? 'Đang lưu...' : booking ? 'Lưu thay đổi' : 'Tạo booking'}
         </button>
       </div>
+
+      {showDepositDialog && booking ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Yeu cau dat coc</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Nhap so tien coc cho booking {booking.id.slice(0, 6).toUpperCase()}.
+            </p>
+
+            <label className="mt-3 block space-y-1.5">
+              <span className="text-sm font-medium text-slate-700">So tien coc (VND)</span>
+              <input
+                type="number"
+                min={0}
+                value={depositRequestAmount}
+                onChange={(event) => setDepositRequestAmount(Math.max(0, Number(event.target.value) || 0))}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+              <p className="text-xs text-slate-500">Mac dinh 1 dem: {toVnd(booking.roomRate || 0)}</p>
+            </label>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDepositDialog(false)}
+                disabled={Boolean(generatingDoc)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600"
+              >
+                Huy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleGenerateDepositRequest()
+                }}
+                disabled={Boolean(generatingDoc)}
+                className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {generatingDoc === 'deposit' ? 'Dang tao...' : 'Tao PDF co QR'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   )
 }

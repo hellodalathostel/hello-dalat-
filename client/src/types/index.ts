@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore'
+
 export interface Room {
   id: string
   number: string
@@ -64,6 +66,7 @@ export interface Booking {
   breakfastIncluded: boolean
   status: 'confirmed' | 'checkedin' | 'checkedout' | 'cancelled' | 'noshow'
   notes: string
+  guests?: Guest[]
   icalEventId: string | null
   createdAt: string
   updatedAt: string
@@ -109,8 +112,7 @@ export type FinanceCategory = IncomeCategory | ExpenseCategory
 export interface Invoice {
   id: string
   invoiceNumber: string
-  bookingId: string | null
-  groupId: string | null
+  bookingId: string
   guestName: string
   issueDate: string
   lineItems: {
@@ -121,8 +123,12 @@ export interface Invoice {
   }[]
   subtotal: number
   discount: number
+  discountNote: string
   total: number
   paymentMethod: 'cash' | 'card' | 'transfer'
+  cardFeeApplied: boolean
+  cardFeeAmount: number
   status: 'paid' | 'pending'
-  pdfUrl: string | null
+  notes: string
+  createdAt: Timestamp
 }
