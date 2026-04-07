@@ -42,8 +42,19 @@ export interface Group {
   notes: string
 }
 
+export interface GroupBooking {
+  id: string
+  group_name: string
+  created_at: string
+  createdAt?: string
+  status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
+  note?: string
+}
+
 export interface Booking {
   id: string
+  group_booking_id?: string | null
+  groupBookingId?: string | null
   roomId: string
   guestName: string
   guestPhone: string

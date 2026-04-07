@@ -1,8 +1,10 @@
 import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom'
-import { FileText } from 'lucide-react'
+import { FileText, Users } from 'lucide-react'
 import PrivateRoute from './components/PrivateRoute'
 import DashboardPage from './pages/DashboardPage'
 import FinancePage from './pages/FinancePage'
+import GroupBookingDetailPage from './pages/GroupBookingDetailPage'
+import GroupBookingsPage from './pages/GroupBookingsPage'
 import InvoicePage from './pages/InvoicePage'
 import LoginPage from './pages/LoginPage'
 
@@ -50,6 +52,19 @@ function PrivateLayout() {
               <FileText className="h-4 w-4" />
               Hóa đơn
             </NavLink>
+            <NavLink
+              to="/group-bookings"
+              className={({ isActive }) =>
+                `inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              <Users className="h-4 w-4" />
+              Booking đoàn
+            </NavLink>
           </div>
         </header>
 
@@ -67,6 +82,8 @@ function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/finance" element={<FinancePage />} />
         <Route path="/invoices" element={<InvoicePage />} />
+        <Route path="/group-bookings" element={<GroupBookingsPage />} />
+        <Route path="/group-bookings/:groupId" element={<GroupBookingDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

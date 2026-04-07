@@ -16,5 +16,5 @@ export interface Totals {
   amount_due: number
 }
 
-export function buildLineItems(reservation: Record<string, unknown>): LineItem[]
+export function buildLineItems(reservation?: unknown): LineItem[]
 export function calcTotals(line_items: LineItem[], payment_method: string, deposit_paid?: number): Totals

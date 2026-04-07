@@ -181,7 +181,7 @@ function SkeletonRows({ visibleDays }: { visibleDays: number }) {
           key={room.id}
           className={skeletonGridClass}
         >
-          <div className="sticky left-0 flex h-20 animate-pulse flex-col justify-center border border-r-0 border-slate-200 bg-[#faf8f1] px-4">
+          <div className="sticky left-0 flex h-14 animate-pulse flex-col justify-center border border-r-0 border-slate-200 bg-[#faf8f1] px-4">
             <div className="h-4 w-12 rounded bg-slate-200" />
             <div className="mt-2 h-3 w-20 rounded bg-slate-100" />
           </div>
@@ -189,9 +189,9 @@ function SkeletonRows({ visibleDays }: { visibleDays: number }) {
             {Array.from({ length: visibleDays }).map((_, index) => (
               <div
                 key={`${room.id}-${index}`}
-                className="h-20 animate-pulse border border-slate-200 bg-white"
+                className="h-14 animate-pulse border border-slate-200 bg-white"
               >
-                <div className="m-3 h-8 rounded-xl bg-slate-100" />
+                <div className="m-2 h-6 rounded-lg bg-slate-100" />
               </div>
             ))}
           </div>
@@ -229,6 +229,14 @@ export default function CalendarGrid({
 
     return map
   }, [bookings, statusOverrides])
+
+  const visibleBookings = useMemo(
+    () =>
+      bookings.filter(
+        (booking) => (effectiveStatusById[booking.id] ?? booking.status) !== 'cancelled',
+      ),
+    [bookings, effectiveStatusById],
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -315,7 +323,7 @@ export default function CalendarGrid({
         </div>
       ) : null}
 
-      {!loading && bookings.length === 0 ? (
+      {!loading && visibleBookings.length === 0 ? (
         <div className="border-b border-primary/10 bg-[#faf8f1] px-4 py-3 text-sm text-slate-600 md:px-6">
           Không có booking nào trong tuần này
         </div>
@@ -348,7 +356,7 @@ export default function CalendarGrid({
 
           {!loading
             ? rooms.map((room) => {
-                const roomBookings = bookings.filter(
+                const roomBookings = visibleBookings.filter(
                   (booking) => booking.roomId === room.id,
                 )
                 const lanes = buildLanes(roomBookings, weekStart, visibleDays)
@@ -375,7 +383,7 @@ export default function CalendarGrid({
                     key={room.id}
                     className={gridClass}
                   >
-                    <div className="sticky left-0 z-10 flex min-h-[92px] flex-col justify-center border-b border-r border-primary/10 bg-[#fffdf8] px-4 py-4 md:px-6">
+                    <div className="sticky left-0 z-10 flex min-h-[68px] flex-col justify-center border-b border-r border-primary/10 bg-[#fffdf8] px-4 py-2 md:px-6">
                       <span className="text-base font-semibold text-slate-900">{room.id}</span>
                       <span className="text-xs text-slate-500">{room.typeLabel}</span>
                       <span className="mt-1 text-xs text-slate-400">
@@ -444,7 +452,7 @@ export default function CalendarGrid({
                                       event.stopPropagation()
                                       onEditBooking(lateCheckoutDecoration.booking)
                                     }}
-                                    className="pointer-events-auto absolute bottom-2 left-1 flex h-7 w-[calc(50%-0.25rem)] items-center justify-center rounded-md bg-purple-300 text-[11px] font-semibold text-purple-900 shadow-sm"
+                                    className="pointer-events-auto absolute bottom-1 left-1 flex h-6 w-[calc(50%-0.25rem)] items-center justify-center rounded-md bg-purple-300 text-[11px] font-semibold text-purple-900 shadow-sm"
                                   >
                                     LCO
                                   </button>
@@ -457,7 +465,7 @@ export default function CalendarGrid({
                                       event.stopPropagation()
                                       onEditBooking(earlyCheckinDecoration.booking)
                                     }}
-                                    className="pointer-events-auto absolute bottom-2 right-1 flex h-7 w-[calc(50%-0.25rem)] items-center justify-center rounded-md bg-amber-300 text-[11px] font-semibold text-amber-900 shadow-sm"
+                                    className="pointer-events-auto absolute bottom-1 right-1 flex h-6 w-[calc(50%-0.25rem)] items-center justify-center rounded-md bg-amber-300 text-[11px] font-semibold text-amber-900 shadow-sm"
                                   >
                                     ECI
                                   </button>
@@ -467,9 +475,9 @@ export default function CalendarGrid({
                           })}
                         </div>
 
-                        <div className="relative z-10 flex min-h-[92px] flex-col gap-2 p-2 pointer-events-none">
+                        <div className="relative z-10 flex min-h-[68px] flex-col gap-1.5 p-1.5 pointer-events-none">
                           {lanes.length === 0 ? (
-                            <div className="h-8" />
+                            <div className="h-6" />
                           ) : (
                             lanes.map((lane, laneIndex) => {
                               let currentColumn = 0
@@ -522,7 +530,7 @@ export default function CalendarGrid({
                                                     : current,
                                                 )
                                               }}
-                                              className={`group flex h-8 w-full items-center rounded-xl px-3 pr-9 text-left text-xs font-medium shadow-sm transition hover:brightness-105 md:text-sm pointer-events-auto ${bookingBarClass}`}
+                                              className={`group flex h-7 w-full items-center rounded-lg px-2.5 pr-9 text-left text-xs font-medium shadow-sm transition hover:brightness-105 pointer-events-auto ${bookingBarClass}`}
                                             >
                                               {isBookingCom ? (
                                                 <span className="mr-2 inline-flex h-4 min-w-4 items-center justify-center rounded bg-white/30 px-1 text-[10px] font-semibold leading-none text-white">
