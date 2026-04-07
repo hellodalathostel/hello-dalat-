@@ -59,6 +59,8 @@ export interface Booking {
   roomRate: number
   totalAmount: number
   services: ServiceItem[]
+  discount?: number
+  discountNote?: string
   depositPaid: number
   paymentStatus: 'pending' | 'partial' | 'paid'
   paymentMethod: 'cash' | 'card' | 'transfer' | 'ota'

@@ -14,7 +14,8 @@ import { FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { db } from '../firebase'
 import { useInvoices } from '../hooks/useInvoices'
 import type { Booking, Invoice } from '../types'
-import { generateInvoicePDF } from '../utils/generateInvoice'
+import { openInvoice } from '../documents/invoice'
+import { buildLineItems } from '../utils/buildLineItems.js'
 
 interface InvoiceLineItemForm {
   description: string
@@ -71,33 +72,13 @@ function makeDefaultDraft(): InvoiceDraft {
   }
 }
 
-function calcNights(checkIn: string, checkOut: string) {
-  const inDate = new Date(`${checkIn}T00:00:00`)
-  const outDate = new Date(`${checkOut}T00:00:00`)
-  const diff = Math.round((outDate.getTime() - inDate.getTime()) / (24 * 60 * 60 * 1000))
-  return diff > 0 ? diff : 1
-}
-
 function buildLineItemsFromBooking(booking: Booking): InvoiceLineItemForm[] {
-  const nights = calcNights(booking.checkIn, booking.checkOut)
-  const rows: InvoiceLineItemForm[] = [
-    toLineItem('Tien phong', nights, booking.roomRate || 0),
-  ]
-
-  if (booking.breakfastIncluded) {
-    const people = Math.max(1, booking.adults + booking.children)
-    rows.push(toLineItem('Breakfast', people * nights, 50000))
-  }
-
-  if (booking.earlyCheckin) {
-    rows.push(toLineItem('Early Check-in', 1, 100000))
-  }
-
-  if (booking.lateCheckout) {
-    rows.push(toLineItem('Late Check-out', 1, 100000))
-  }
-
-  return rows
+  return buildLineItems(booking).map((item) => ({
+    description: item.label_vi || item.label_en,
+    quantity: Number(item.qty) || 1,
+    unitPrice: Number(item.unit_price) || 0,
+    total: Number(item.total) || 0,
+  }))
 }
 
 export default function InvoicePage() {
@@ -151,13 +132,14 @@ export default function InvoicePage() {
 
   function computeTotals(nextDraft: InvoiceDraft): InvoiceDraft {
     const subtotal = nextDraft.lineItems.reduce((sum, item) => sum + item.total, 0)
-    const discounted = Math.max(0, subtotal - Math.max(0, nextDraft.discount))
-    const cardFeeAmount = nextDraft.cardFeeApplied ? Math.round(discounted * 0.04) : 0
-    const total = discounted + cardFeeAmount
+    const cardFeeApplied = nextDraft.paymentMethod === 'card'
+    const cardFeeAmount = cardFeeApplied ? Math.round(subtotal * 0.04) : 0
+    const total = subtotal + cardFeeAmount
 
     return {
       ...nextDraft,
       subtotal,
+      cardFeeApplied,
       cardFeeAmount,
       total,
     }
@@ -171,7 +153,7 @@ export default function InvoicePage() {
 
   function openEdit(invoice: Invoice) {
     setEditingInvoice(invoice)
-    setDraft({
+    setDraft(computeTotals({
       bookingId: invoice.bookingId,
       guestName: invoice.guestName,
       issueDate: invoice.issueDate,
@@ -185,7 +167,7 @@ export default function InvoicePage() {
       cardFeeAmount: invoice.cardFeeAmount,
       status: invoice.status,
       notes: invoice.notes,
-    })
+    }))
     setShowModal(true)
   }
 
@@ -236,7 +218,7 @@ export default function InvoicePage() {
     })
   }
 
-  async function handleSave(exportAfterSave: boolean) {
+  async function handleSave(openAfterSave: boolean) {
     const booking = bookingById.get(draft.bookingId)
 
     if (!booking || !draft.guestName.trim() || draft.lineItems.length === 0) {
@@ -259,21 +241,21 @@ export default function InvoicePage() {
       notes: draft.notes,
     }
 
-    let invoiceForPdf: Invoice | null = null
+    let invoiceForDocument: Invoice | null = null
 
     if (editingInvoice) {
       await updateInvoice(editingInvoice.id, payload)
-      invoiceForPdf = {
+      invoiceForDocument = {
         ...editingInvoice,
         ...payload,
       }
     } else {
       const created = await createInvoice(payload)
-      invoiceForPdf = created
+      invoiceForDocument = created
     }
 
-    if (exportAfterSave && invoiceForPdf) {
-      await generateInvoicePDF(invoiceForPdf, booking, booking.guests ?? [])
+    if (openAfterSave && invoiceForDocument) {
+      openInvoice(booking, invoiceForDocument)
     }
 
     setShowModal(false)
@@ -365,11 +347,11 @@ export default function InvoicePage() {
                               type="button"
                               onClick={() => {
                                 if (booking) {
-                                  void generateInvoicePDF(invoice, booking, booking.guests ?? [])
+                                  openInvoice(booking, invoice)
                                 }
                               }}
                               className="rounded-lg border border-primary/25 px-2 py-1 text-primary hover:bg-primary/10"
-                              title="Xuat PDF"
+                              title="Mo hoa don"
                             >
                               <FileText className="h-4 w-4" />
                             </button>
@@ -451,7 +433,9 @@ export default function InvoicePage() {
                 PTTT
                 <select
                   value={draft.paymentMethod}
-                  onChange={(event) => setDraft((current) => ({ ...current, paymentMethod: event.target.value as Invoice['paymentMethod'] }))}
+                  onChange={(event) =>
+                    setDraft((current) => computeTotals({ ...current, paymentMethod: event.target.value as Invoice['paymentMethod'] }))
+                  }
                   className="w-full rounded-lg border border-slate-200 px-3 py-2"
                 >
                   <option value="cash">Tien mat</option>
@@ -552,8 +536,8 @@ export default function InvoicePage() {
               <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">
                 <input
                   type="checkbox"
-                  checked={draft.cardFeeApplied}
-                  onChange={(event) => setDraft((current) => computeTotals({ ...current, cardFeeApplied: event.target.checked }))}
+                  checked={draft.paymentMethod === 'card'}
+                  disabled
                 />
                 Ap dung phi the 4%
               </label>
@@ -600,7 +584,7 @@ export default function InvoicePage() {
                 }}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
               >
-                Xuat PDF ngay
+                Luu va mo
               </button>
             </div>
           </div>
