@@ -159,8 +159,8 @@ export function buildDepositRequestHtml(reservation) {
         ${renderBankRow('Amount', 'Số tiền', `${formatVND(depositAmount)} VND`)}
         ${renderBankRow('Transfer Note', 'Nội dung CK', transferNote, true)}
       </div>
-      <div style="width: 144px; flex: 0 0 144px; text-align: right;">
-        <img src="${buildVietQrUrl(depositAmount, transferNote)}" alt="QR" style="width: 128px; height: 128px; object-fit: contain;">
+      <div style="width: 232px; flex: 0 0 232px; text-align: right;">
+        <img src="${buildVietQrUrl(depositAmount, transferNote)}" alt="QR" style="width: 220px; height: 220px; object-fit: contain;">
       </div>
     </div>
 

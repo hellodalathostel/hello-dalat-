@@ -196,8 +196,8 @@ export function buildInvoiceHtml(reservation, invoice) {
         ${renderInfoItem('Amount', 'Số tiền', `${formatVND(amount_due)} VND`)}
         ${renderInfoItem('Transfer Note', 'Nội dung CK', transferNote)}
       </div>
-      <div style="width: 144px; flex: 0 0 144px; text-align: right;">
-        <img src="${buildVietQrUrl(amount_due, transferNote)}" alt="QR" style="width: 128px; height: 128px; object-fit: contain;">
+      <div style="width: 232px; flex: 0 0 232px; text-align: right;">
+        <img src="${buildVietQrUrl(amount_due, transferNote)}" alt="QR" style="width: 220px; height: 220px; object-fit: contain;">
       </div>
     </div>
 

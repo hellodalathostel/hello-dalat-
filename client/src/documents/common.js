@@ -217,7 +217,7 @@ export function buildVietQrUrl(amount, note) {
   const bankId = 'VCB'
   const accountName = encodeURIComponent(hostelConfig.bank_owner)
   const addInfo = encodeURIComponent(note)
-  return `https://img.vietqr.io/image/${bankId}-${hostelConfig.bank_account}-compact2.png?amount=${amount}&addInfo=${addInfo}&accountName=${accountName}`
+  return `https://img.vietqr.io/image/${bankId}-${hostelConfig.bank_account}-print.png?amount=${amount}&addInfo=${addInfo}&accountName=${accountName}`
 }
 
 export function renderHeader(title, metaLines = [], subtitle = '') {
@@ -269,8 +269,8 @@ export function renderBankBox(lang, amount, transferNote) {
         <p>${escapeHtml(t(lang, 'So tien', 'Amount'))}: ${formatVND(amount)} VND</p>
         <p><strong>${escapeHtml(t(lang, 'Noi dung CK', 'Transfer note'))}:</strong> ${escapeHtml(transferNote)}</p>
       </div>
-      <div style="width: 144px; flex: 0 0 144px; text-align: right;">
-        <img src="${buildVietQrUrl(amount, transferNote)}" alt="QR" style="width: 128px; height: 128px; object-fit: contain;">
+      <div style="width: 232px; flex: 0 0 232px; text-align: right;">
+        <img src="${buildVietQrUrl(amount, transferNote)}" alt="QR" style="width: 220px; height: 220px; object-fit: contain;">
       </div>
     </div>
   `
