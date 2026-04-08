@@ -32,7 +32,7 @@ export default function BookingTooltip({
   onOpenDetail,
 }: BookingTooltipProps) {
   return (
-    <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl">
+    <div className="absolute left-0 top-full z-[70] mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xl">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">

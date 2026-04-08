@@ -194,13 +194,21 @@ export function useGroupBookings(): UseGroupBookingsResult {
     }
 
     const roomsSnapshot = await getDocs(
-      query(collection(db, 'bookings'), where('group_booking_id', '==', groupId), orderBy('checkIn', 'asc')),
+      query(collection(db, 'bookings'), where('group_booking_id', '==', groupId)),
     )
 
     const rooms = roomsSnapshot.docs.map((item) => ({
       id: item.id,
       ...(item.data() as Omit<Booking, 'id'>),
     }))
+      .sort((left, right) => {
+        const byCheckIn = left.checkIn.localeCompare(right.checkIn)
+        if (byCheckIn !== 0) {
+          return byCheckIn
+        }
+
+        return left.roomId.localeCompare(right.roomId)
+      })
 
     return {
       group: {

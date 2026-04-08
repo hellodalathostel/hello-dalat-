@@ -359,6 +359,9 @@ export default function CalendarGrid({
                 const roomBookings = visibleBookings.filter(
                   (booking) => booking.roomId === room.id,
                 )
+                const roomHasActiveTooltip = roomBookings.some(
+                  (booking) => booking.id === activeBookingId,
+                )
                 const lanes = buildLanes(roomBookings, weekStart, visibleDays)
                 const dayCells = weekDates.map((date) => {
                   const dateKey = format(date, 'yyyy-MM-dd')
@@ -381,14 +384,10 @@ export default function CalendarGrid({
                 return (
                   <div
                     key={room.id}
-                    className={gridClass}
+                    className={`${gridClass} ${roomHasActiveTooltip ? 'relative z-40' : ''}`}
                   >
-                    <div className="sticky left-0 z-10 flex min-h-[68px] flex-col justify-center border-b border-r border-primary/10 bg-[#fffdf8] px-4 py-2 md:px-6">
+                    <div className="sticky left-0 z-10 flex min-h-[54px] items-center border-b border-r border-primary/10 bg-[#fffdf8] px-4 py-2 md:px-6">
                       <span className="text-base font-semibold text-slate-900">{room.id}</span>
-                      <span className="text-xs text-slate-500">{room.typeLabel}</span>
-                      <span className="mt-1 text-xs text-slate-400">
-                        {room.capacity} khách
-                      </span>
                     </div>
 
                     <div
@@ -475,7 +474,7 @@ export default function CalendarGrid({
                           })}
                         </div>
 
-                        <div className="relative z-10 flex min-h-[68px] flex-col gap-1.5 p-1.5 pointer-events-none">
+                        <div className="relative z-10 flex min-h-[54px] flex-col gap-1.5 p-1.5 pointer-events-none">
                           {lanes.length === 0 ? (
                             <div className="h-6" />
                           ) : (
@@ -514,7 +513,7 @@ export default function CalendarGrid({
                                       <Fragment key={placement.booking.id}>
                                         {gapNode}
                                         <div className={spanClassMap[placement.span - 1]}>
-                                          <div className="relative">
+                                          <div className={`relative ${activeBookingId === placement.booking.id ? 'z-50' : ''}`}>
                                             <button
                                               type="button"
                                               onClick={() => {
