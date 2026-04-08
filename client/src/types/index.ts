@@ -145,3 +145,43 @@ export interface Invoice {
   notes: string
   createdAt: Timestamp
 }
+
+export type RevenueCategory = 'room' | 'breakfast' | 'scooter' | 'tour' | 'other'
+
+export interface RevenueItem {
+  id: string
+  booking_id: string | null
+  group_booking_id: string | null
+  date: string
+  category: RevenueCategory
+  description: string
+  amount: number
+  payment_method: 'cash' | 'card'
+  card_surcharge: number
+  status: 'paid' | 'unpaid'
+  room_id?: string | null
+  guest_name?: string
+  created_at: string
+  updated_at: string
+}
+
+export type ExpenseCategoryV2 =
+  | 'electricity'
+  | 'water'
+  | 'salary'
+  | 'supplies'
+  | 'maintenance'
+  | 'marketing'
+  | 'other'
+
+export interface ExpenseItem {
+  id: string
+  date: string
+  category: ExpenseCategoryV2
+  description: string
+  amount: number
+  paid_by?: string
+  note?: string
+  created_at: string
+  updated_at: string
+}

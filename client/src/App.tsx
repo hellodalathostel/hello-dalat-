@@ -28,7 +28,7 @@ function PrivateLayout() {
               Lịch đặt phòng
             </NavLink>
             <NavLink
-              to="/finance"
+              to="/finance?tab=revenue"
               className={({ isActive }) =>
                 `rounded-xl px-3 py-2 text-sm font-medium transition ${
                   isActive
@@ -38,6 +38,42 @@ function PrivateLayout() {
               }
             >
               Tài chính
+            </NavLink>
+            <NavLink
+              to="/finance?tab=expense"
+              className={({ isActive }) =>
+                `rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              Chi phí
+            </NavLink>
+            <NavLink
+              to="/finance?tab=debt"
+              className={({ isActive }) =>
+                `rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              Công nợ
+            </NavLink>
+            <NavLink
+              to="/finance?tab=profit"
+              className={({ isActive }) =>
+                `rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              Báo cáo lợi nhuận
             </NavLink>
             <NavLink
               to="/invoices"

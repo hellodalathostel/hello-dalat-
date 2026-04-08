@@ -1,12 +1,13 @@
-import { addMonths, format, parse, parseISO } from 'date-fns'
+import { addMonths, endOfMonth, format, parse, parseISO, startOfMonth } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import { deleteDoc, doc } from 'firebase/firestore'
-import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
-import FinanceEntryModal from '../components/finance/FinanceEntryModal'
-import { db } from '../firebase'
-import { useFinance } from '../hooks/useFinance'
-import type { FinanceEntry } from '../types'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Download, Plus, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { useFinanceModule } from '../hooks/useFinanceModule'
+import { downloadCsv } from '../utils/exportCsv'
+import type { ExpenseCategoryV2, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
+
+type FinanceTab = 'revenue' | 'expense' | 'debt' | 'profit'
 
 function formatMoney(value: number) {
   return `${value.toLocaleString('vi-VN')} đ`
@@ -16,34 +17,264 @@ function parseMonth(month: string) {
   return parse(`${month}-01`, 'yyyy-MM-dd', new Date())
 }
 
-export default function FinancePage() {
-  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+const revenueCategories: Array<{ value: RevenueCategory; label: string }> = [
+  { value: 'room', label: 'Phòng' },
+  { value: 'breakfast', label: 'Ăn sáng' },
+  { value: 'scooter', label: 'Xe máy' },
+  { value: 'tour', label: 'Tour' },
+  { value: 'other', label: 'Khác' },
+]
 
-  const { entries, loading, error, totalIncome, totalExpense, netProfit } = useFinance(month)
+const expenseCategories: Array<{ value: ExpenseCategoryV2; label: string }> = [
+  { value: 'electricity', label: 'Điện' },
+  { value: 'water', label: 'Nước' },
+  { value: 'salary', label: 'Lương' },
+  { value: 'supplies', label: 'Vật tư' },
+  { value: 'maintenance', label: 'Bảo trì' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'other', label: 'Khác' },
+]
+
+interface RevenueForm {
+  date: string
+  category: RevenueCategory
+  description: string
+  amount: number
+  payment_method: 'cash' | 'card'
+  status: 'paid' | 'unpaid'
+}
+
+interface ExpenseForm {
+  date: string
+  category: ExpenseCategoryV2
+  description: string
+  amount: number
+  paid_by: string
+  note: string
+}
+
+function getRevenueLabel(category: RevenueCategory) {
+  return revenueCategories.find((item) => item.value === category)?.label ?? category
+}
+
+function getExpenseLabel(category: ExpenseCategoryV2) {
+  return expenseCategories.find((item) => item.value === category)?.label ?? category
+}
+
+function revenueTotal(item: RevenueItem) {
+  return Number(item.amount || 0) + Number(item.card_surcharge || 0)
+}
+
+export default function FinancePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const initialTab = (searchParams.get('tab') as FinanceTab | null) || 'revenue'
+  const [tab, setTab] = useState<FinanceTab>(initialTab)
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null)
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
+
+  const monthStart = format(startOfMonth(parseMonth(month)), 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(parseMonth(month)), 'yyyy-MM-dd')
+  const [fromDate, setFromDate] = useState(monthStart)
+  const [toDate, setToDate] = useState(monthEnd)
+
+  const {
+    revenueItems,
+    expenses,
+    error,
+    totalRevenuePaid,
+    totalExpenses,
+    netProfit,
+    outstandingDebt,
+    addRevenueItem,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    markRevenuePaid,
+  } = useFinanceModule({ from: fromDate, to: toDate })
+
+  const [revenueForm, setRevenueForm] = useState<RevenueForm>({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    category: 'other',
+    description: '',
+    amount: 0,
+    payment_method: 'cash',
+    status: 'paid',
+  })
+
+  const [expenseForm, setExpenseForm] = useState<ExpenseForm>({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    category: 'supplies',
+    description: '',
+    amount: 0,
+    paid_by: '',
+    note: '',
+  })
 
   const monthLabel = useMemo(
     () => format(parseMonth(month), "'Tháng' M/yyyy", { locale: vi }),
     [month],
   )
 
-  async function handleDeleteEntry(entry: FinanceEntry) {
-    const confirmed = window.confirm('Xóa giao dịch này? Không thể hoàn tác.')
+  useEffect(() => {
+    const nextTab = (searchParams.get('tab') as FinanceTab | null) || 'revenue'
+    setTab(nextTab)
+  }, [searchParams])
 
-    if (!confirmed) {
+  const revenueByCategory = useMemo(() => {
+    const grouped: Record<RevenueCategory, number> = {
+      room: 0,
+      breakfast: 0,
+      scooter: 0,
+      tour: 0,
+      other: 0,
+    }
+
+    revenueItems
+      .filter((item) => item.status === 'paid')
+      .forEach((item) => {
+        grouped[item.category] += revenueTotal(item)
+      })
+
+    return grouped
+  }, [revenueItems])
+
+  const expenseByCategory = useMemo(() => {
+    const grouped: Record<ExpenseCategoryV2, number> = {
+      electricity: 0,
+      water: 0,
+      salary: 0,
+      supplies: 0,
+      maintenance: 0,
+      marketing: 0,
+      other: 0,
+    }
+
+    expenses.forEach((item) => {
+      grouped[item.category] += Number(item.amount || 0)
+    })
+
+    return grouped
+  }, [expenses])
+
+  async function handleAddRevenue(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!revenueForm.description.trim() || revenueForm.amount <= 0) {
       return
     }
 
-    setDeletingId(entry.id)
+    await addRevenueItem({
+      date: revenueForm.date,
+      category: revenueForm.category,
+      description: revenueForm.description,
+      amount: revenueForm.amount,
+      payment_method: revenueForm.payment_method,
+      status: revenueForm.status,
+    })
 
-    try {
-      await deleteDoc(doc(db, 'financeEntries', entry.id))
-    } catch (deleteError) {
-      console.error(deleteError)
-    } finally {
-      setDeletingId(null)
+    setRevenueForm((current) => ({
+      ...current,
+      description: '',
+      amount: 0,
+    }))
+  }
+
+  async function handleAddExpense(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!expenseForm.description.trim() || expenseForm.amount <= 0) {
+      return
     }
+
+    await addExpense(expenseForm)
+    setExpenseForm((current) => ({
+      ...current,
+      description: '',
+      amount: 0,
+      paid_by: '',
+      note: '',
+    }))
+  }
+
+  async function handleDeleteExpense(entry: ExpenseItem) {
+    if (!window.confirm('Xóa chi phí này?')) {
+      return
+    }
+    setDeletingExpenseId(entry.id)
+    try {
+      await deleteExpense(entry.id)
+    } finally {
+      setDeletingExpenseId(null)
+    }
+  }
+
+  function exportRevenueCsv() {
+    downloadCsv(
+      `doanh-thu-${fromDate}-${toDate}.csv`,
+      ['Ngày', 'Booking ID', 'Phòng', 'Khách', 'Danh mục', 'Mô tả', 'Số tiền', 'Phương thức', 'Phụ thu thẻ', 'Trạng thái'],
+      revenueItems.map((item) => [
+        item.date,
+        item.booking_id || '',
+        item.room_id || '',
+        item.guest_name || '',
+        getRevenueLabel(item.category),
+        item.description,
+        item.amount,
+        item.payment_method,
+        item.card_surcharge,
+        item.status,
+      ]),
+    )
+  }
+
+  function exportExpenseCsv() {
+    downloadCsv(
+      `chi-phi-${fromDate}-${toDate}.csv`,
+      ['Ngày', 'Danh mục', 'Mô tả', 'Số tiền', 'Ghi chú'],
+      expenses.map((item) => [item.date, getExpenseLabel(item.category), item.description, item.amount, item.note || '']),
+    )
+  }
+
+  function exportDebtCsv() {
+    const unpaid = revenueItems.filter((item) => item.status === 'unpaid')
+    downloadCsv(
+      `cong-no-${fromDate}-${toDate}.csv`,
+      ['Ngày', 'Khách', 'Phòng', 'Danh mục', 'Số tiền', 'Booking ID'],
+      unpaid.map((item) => [
+        item.date,
+        item.guest_name || '',
+        item.room_id || '',
+        getRevenueLabel(item.category),
+        revenueTotal(item),
+        item.booking_id || '',
+      ]),
+    )
+  }
+
+  function exportProfitCsv() {
+    const revenueRows = Object.entries(revenueByCategory).map(([category, amount]) => [
+      `Revenue - ${getRevenueLabel(category as RevenueCategory)}`,
+      amount,
+      totalRevenuePaid > 0 ? `${((amount / totalRevenuePaid) * 100).toFixed(2)}%` : '0%',
+    ])
+
+    const expenseRows = Object.entries(expenseByCategory).map(([category, amount]) => [
+      `Expense - ${getExpenseLabel(category as ExpenseCategoryV2)}`,
+      amount,
+      totalExpenses > 0 ? `${((amount / totalExpenses) * 100).toFixed(2)}%` : '0%',
+    ])
+
+    downloadCsv(
+      `bao-cao-loi-nhuan-${fromDate}-${toDate}.csv`,
+      ['Mục', 'Giá trị', 'Tỷ trọng'],
+      [
+        ['Total Revenue (Paid)', totalRevenuePaid, ''],
+        ['Total Expenses', totalExpenses, ''],
+        ['Outstanding Debt', outstandingDebt, ''],
+        ['Net Profit', netProfit, ''],
+        ...revenueRows,
+        ...expenseRows,
+      ],
+    )
   }
 
   return (
@@ -55,15 +286,6 @@ export default function FinancePage() {
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-primary/60">Finance</p>
               <h1 className="mt-2 text-3xl font-semibold text-slate-900">Tài chính</h1>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
-            >
-              <Plus className="h-4 w-4" />
-              Thêm giao dịch
-            </button>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -92,25 +314,68 @@ export default function FinancePage() {
               Tháng sau
               <ChevronRight className="h-4 w-4" />
             </button>
+
+            <div className="ml-auto flex items-center gap-2">
+              <label className="text-xs text-slate-500">Từ</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+                className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+              />
+              <label className="text-xs text-slate-500">Đến</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+                className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {([
+              ['revenue', 'Doanh thu'],
+              ['expense', 'Chi phí'],
+              ['debt', 'Công nợ'],
+              ['profit', 'Báo cáo lợi nhuận'],
+            ] as Array<[FinanceTab, string]>).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setTab(value)
+                  setSearchParams({ tab: value })
+                }}
+                className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                  tab === value
+                    ? 'bg-primary text-white'
+                    : 'border border-slate-200 text-slate-600 hover:border-primary/30 hover:text-primary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <article className="rounded-2xl border border-primary/15 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Doanh thu</p>
-            <p className="mt-2 text-2xl font-semibold text-primary">{formatMoney(totalIncome)}</p>
+            <p className="text-sm text-slate-500">Doanh thu (đã thu)</p>
+            <p className="mt-2 text-2xl font-semibold text-primary">{formatMoney(totalRevenuePaid)}</p>
           </article>
 
           <article className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">Chi phí</p>
-            <p className="mt-2 text-2xl font-semibold text-red-500">{formatMoney(totalExpense)}</p>
+            <p className="mt-2 text-2xl font-semibold text-red-500">{formatMoney(totalExpenses)}</p>
           </article>
 
           <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Lợi nhuận</p>
+            <p className="text-sm text-slate-500">Lợi nhuận / Công nợ</p>
             <p className={`mt-2 text-2xl font-semibold ${netProfit >= 0 ? 'text-primary' : 'text-red-500'}`}>
               {formatMoney(netProfit)}
             </p>
+            <p className="mt-1 text-xs text-slate-500">Công nợ: {formatMoney(outstandingDebt)}</p>
           </article>
         </section>
 
@@ -121,74 +386,241 @@ export default function FinancePage() {
             </div>
           ) : null}
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-[#f6f3e8] text-slate-700">
-                <tr>
-                  <th className="px-4 py-3 font-semibold md:px-6">Ngày</th>
-                  <th className="px-4 py-3 font-semibold md:px-6">Loại</th>
-                  <th className="px-4 py-3 font-semibold md:px-6">Danh mục</th>
-                  <th className="px-4 py-3 font-semibold md:px-6">Ghi chú</th>
-                  <th className="px-4 py-3 font-semibold md:px-6">Số tiền</th>
-                  <th className="px-4 py-3 font-semibold md:px-6">Xóa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500 md:px-6">
-                      Đang tải dữ liệu tài chính...
-                    </td>
-                  </tr>
-                ) : entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500 md:px-6">
-                      Chưa có giao dịch trong tháng này
-                    </td>
-                  </tr>
-                ) : (
-                  entries.map((entry) => (
-                    <tr key={entry.id} className="border-t border-slate-100">
-                      <td className="px-4 py-3 md:px-6">{format(parseISO(entry.date), 'dd/MM/yyyy')}</td>
-                      <td className="px-4 py-3 md:px-6">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${entry.type === 'income' ? 'bg-primary/10 text-primary' : 'bg-red-50 text-red-500'}`}>
-                          {entry.type === 'income' ? 'Thu' : 'Chi'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 md:px-6 text-slate-700">{entry.category}</td>
-                      <td className="px-4 py-3 md:px-6 text-slate-600">{entry.note || '-'}</td>
-                      <td className={`px-4 py-3 font-semibold md:px-6 ${entry.type === 'income' ? 'text-primary' : 'text-red-500'}`}>
-                        {entry.type === 'income' ? '' : '-'}{formatMoney(entry.amount)}
-                      </td>
-                      <td className="px-4 py-3 md:px-6">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void handleDeleteEntry(entry)
-                          }}
-                          disabled={deletingId === entry.id}
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Xóa
-                        </button>
-                      </td>
+          {tab === 'revenue' ? (
+            <div className="space-y-4 p-4 md:p-6">
+              <form onSubmit={handleAddRevenue} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-[#fffdf8] p-3 md:grid-cols-6">
+                <input type="date" value={revenueForm.date} onChange={(event) => setRevenueForm((c) => ({ ...c, date: event.target.value }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                <select value={revenueForm.category} onChange={(event) => setRevenueForm((c) => ({ ...c, category: event.target.value as RevenueCategory }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                  {revenueCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+                <input value={revenueForm.description} onChange={(event) => setRevenueForm((c) => ({ ...c, description: event.target.value }))} placeholder="Mô tả" className="rounded-lg border border-slate-200 px-2 py-2 text-sm md:col-span-2" />
+                <input type="number" min={0} value={revenueForm.amount} onChange={(event) => setRevenueForm((c) => ({ ...c, amount: Math.max(0, Number(event.target.value) || 0) }))} placeholder="Số tiền" className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                <div className="flex gap-2">
+                  <select value={revenueForm.payment_method} onChange={(event) => setRevenueForm((c) => ({ ...c, payment_method: event.target.value as 'cash' | 'card' }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                  </select>
+                  <select value={revenueForm.status} onChange={(event) => setRevenueForm((c) => ({ ...c, status: event.target.value as 'paid' | 'unpaid' }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                    <option value="paid">Paid</option>
+                    <option value="unpaid">Unpaid</option>
+                  </select>
+                  <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" /> Thêm</button>
+                </div>
+              </form>
+
+              <div className="flex justify-end">
+                <button type="button" onClick={exportRevenueCsv} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-primary/30 hover:text-primary"><Download className="h-4 w-4" /> Export CSV</button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-[#f6f3e8] text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2">Ngày</th>
+                      <th className="px-3 py-2">Booking</th>
+                      <th className="px-3 py-2">Danh mục</th>
+                      <th className="px-3 py-2">Mô tả</th>
+                      <th className="px-3 py-2">Số tiền</th>
+                      <th className="px-3 py-2">TT</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {revenueItems.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2">{format(parseISO(item.date), 'dd/MM/yyyy')}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.booking_id || '-'}</td>
+                        <td className="px-3 py-2">{getRevenueLabel(item.category)}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.description}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-900">{formatMoney(revenueTotal(item))}</td>
+                        <td className="px-3 py-2">
+                          {item.status === 'paid' ? (
+                            <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">Paid</span>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => void markRevenuePaid(item.id, 'cash')} className="rounded border border-slate-200 px-2 py-1 text-xs">Cash</button>
+                              <button type="button" onClick={() => void markRevenuePaid(item.id, 'card')} className="rounded border border-slate-200 px-2 py-1 text-xs">Card</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          ) : null}
+
+          {tab === 'expense' ? (
+            <div className="space-y-4 p-4 md:p-6">
+              <form onSubmit={handleAddExpense} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-[#fffdf8] p-3 md:grid-cols-6">
+                <input type="date" value={expenseForm.date} onChange={(event) => setExpenseForm((c) => ({ ...c, date: event.target.value }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                <select value={expenseForm.category} onChange={(event) => setExpenseForm((c) => ({ ...c, category: event.target.value as ExpenseCategoryV2 }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                  {expenseCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+                <input value={expenseForm.description} onChange={(event) => setExpenseForm((c) => ({ ...c, description: event.target.value }))} placeholder="Mô tả" className="rounded-lg border border-slate-200 px-2 py-2 text-sm md:col-span-2" />
+                <input type="number" min={0} value={expenseForm.amount} onChange={(event) => setExpenseForm((c) => ({ ...c, amount: Math.max(0, Number(event.target.value) || 0) }))} placeholder="Số tiền" className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                <div className="flex gap-2">
+                  <input value={expenseForm.paid_by} onChange={(event) => setExpenseForm((c) => ({ ...c, paid_by: event.target.value }))} placeholder="Người chi" className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                  <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" /> Thêm</button>
+                </div>
+              </form>
+
+              <div className="flex justify-end">
+                <button type="button" onClick={exportExpenseCsv} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-primary/30 hover:text-primary"><Download className="h-4 w-4" /> Export CSV</button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-[#f6f3e8] text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2">Ngày</th>
+                      <th className="px-3 py-2">Danh mục</th>
+                      <th className="px-3 py-2">Mô tả</th>
+                      <th className="px-3 py-2">Số tiền</th>
+                      <th className="px-3 py-2">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenses.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2">{format(parseISO(item.date), 'dd/MM/yyyy')}</td>
+                        <td className="px-3 py-2">{getExpenseLabel(item.category)}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.description}</td>
+                        <td className="px-3 py-2 font-semibold text-red-500">-{formatMoney(item.amount)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextDesc = window.prompt('Mô tả mới', item.description)
+                                if (nextDesc === null) return
+                                const nextAmountRaw = window.prompt('Số tiền mới', String(item.amount))
+                                if (nextAmountRaw === null) return
+                                const nextAmount = Math.max(0, Number(nextAmountRaw) || 0)
+                                setEditingExpenseId(item.id)
+                                void updateExpense(item.id, { description: nextDesc, amount: nextAmount }).finally(() => setEditingExpenseId(null))
+                              }}
+                              disabled={editingExpenseId === item.id}
+                              className="rounded border border-slate-200 px-2 py-1 text-xs"
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { void handleDeleteExpense(item) }}
+                              disabled={deletingExpenseId === item.id}
+                              className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-1 text-xs text-red-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">Tổng chi phí theo danh mục</div>
+                <div className="p-3">
+                  {Object.entries(expenseByCategory).map(([key, amount]) => (
+                    <div key={key} className="flex items-center justify-between border-b border-slate-100 py-2 text-sm last:border-b-0">
+                      <span>{getExpenseLabel(key as ExpenseCategoryV2)}</span>
+                      <span className="font-semibold text-red-600">{formatMoney(amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === 'debt' ? (
+            <div className="space-y-4 p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600">Tổng công nợ: <span className="font-semibold text-red-600">{formatMoney(outstandingDebt)}</span></p>
+                <button type="button" onClick={exportDebtCsv} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-primary/30 hover:text-primary"><Download className="h-4 w-4" /> Export CSV</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-[#f6f3e8] text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2">Ngày</th>
+                      <th className="px-3 py-2">Khách</th>
+                      <th className="px-3 py-2">Phòng</th>
+                      <th className="px-3 py-2">Danh mục</th>
+                      <th className="px-3 py-2">Số tiền</th>
+                      <th className="px-3 py-2">Booking ID</th>
+                      <th className="px-3 py-2">Mark Paid</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenueItems.filter((item) => item.status === 'unpaid').map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2">{format(parseISO(item.date), 'dd/MM/yyyy')}</td>
+                        <td className="px-3 py-2">{item.guest_name || '-'}</td>
+                        <td className="px-3 py-2">{item.room_id || '-'}</td>
+                        <td className="px-3 py-2">{getRevenueLabel(item.category)}</td>
+                        <td className="px-3 py-2 font-semibold text-red-600">{formatMoney(revenueTotal(item))}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.booking_id || '-'}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => void markRevenuePaid(item.id, 'cash')} className="rounded border border-slate-200 px-2 py-1 text-xs">Cash</button>
+                            <button type="button" onClick={() => void markRevenuePaid(item.id, 'card')} className="rounded border border-slate-200 px-2 py-1 text-xs">Card</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === 'profit' ? (
+            <div className="space-y-4 p-4 md:p-6">
+              <div className="flex justify-end">
+                <button type="button" onClick={exportProfitCsv} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-primary/30 hover:text-primary"><Download className="h-4 w-4" /> Export CSV</button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <article className="rounded-xl border border-primary/10 bg-[#faf8f1] p-3"><p className="text-xs text-slate-500">Total Revenue</p><p className="mt-1 text-lg font-semibold text-primary">{formatMoney(totalRevenuePaid)}</p></article>
+                <article className="rounded-xl border border-red-100 bg-red-50/40 p-3"><p className="text-xs text-slate-500">Total Expenses</p><p className="mt-1 text-lg font-semibold text-red-500">{formatMoney(totalExpenses)}</p></article>
+                <article className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"><p className="text-xs text-slate-500">Net Profit</p><p className={`mt-1 text-lg font-semibold ${netProfit >= 0 ? 'text-primary' : 'text-red-500'}`}>{formatMoney(netProfit)}</p></article>
+                <article className="rounded-xl border border-amber-200 bg-amber-50/60 p-3"><p className="text-xs text-slate-500">Outstanding Debt</p><p className="mt-1 text-lg font-semibold text-amber-700">{formatMoney(outstandingDebt)}</p></article>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-white">
+                  <div className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">Revenue Breakdown</div>
+                  <div className="p-3">
+                    {Object.entries(revenueByCategory).map(([key, amount]) => (
+                      <div key={key} className="flex items-center justify-between border-b border-slate-100 py-2 text-sm last:border-b-0">
+                        <span>{getRevenueLabel(key as RevenueCategory)}</span>
+                        <span className="font-semibold">{formatMoney(amount)} ({totalRevenuePaid > 0 ? ((amount / totalRevenuePaid) * 100).toFixed(1) : '0'}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white">
+                  <div className="border-b border-slate-100 px-4 py-3 font-semibold text-slate-900">Expense Breakdown</div>
+                  <div className="p-3">
+                    {Object.entries(expenseByCategory).map(([key, amount]) => (
+                      <div key={key} className="flex items-center justify-between border-b border-slate-100 py-2 text-sm last:border-b-0">
+                        <span>{getExpenseLabel(key as ExpenseCategoryV2)}</span>
+                        <span className="font-semibold">{formatMoney(amount)} ({totalExpenses > 0 ? ((amount / totalExpenses) * 100).toFixed(1) : '0'}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
-
-      <FinanceEntryModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSaved={() => {
-          setIsModalOpen(false)
-        }}
-      />
     </main>
   )
 }

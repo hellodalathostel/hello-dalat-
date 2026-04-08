@@ -2,6 +2,7 @@ import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore'
 import { useEffect, useMemo, useState } from 'react'
 import { db } from '../../firebase'
+import { ensureRevenueItemsForBooking } from '../../services/revenueSync'
 import type { Booking, ServiceItem } from '../../types'
 
 const roomOptions = [
@@ -420,11 +421,27 @@ export default function BookingForm({
 
       if (booking) {
         await updateDoc(doc(db, 'bookings', booking.id), payload)
+
+        if (payload.status === 'checkedout' || payload.paymentStatus === 'paid') {
+          await ensureRevenueItemsForBooking({
+            ...booking,
+            ...payload,
+            id: booking.id,
+          })
+        }
       } else {
-        await addDoc(collection(db, 'bookings'), {
+        const created = await addDoc(collection(db, 'bookings'), {
           ...payload,
           createdAt: now,
         })
+
+        if (payload.status === 'checkedout' || payload.paymentStatus === 'paid') {
+          await ensureRevenueItemsForBooking({
+            ...(payload as Omit<Booking, 'id' | 'createdAt'>),
+            id: created.id,
+            createdAt: now,
+          } as Booking)
+        }
       }
 
       onSaved()

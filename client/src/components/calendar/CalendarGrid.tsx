@@ -9,6 +9,7 @@ import {
 import { doc, updateDoc } from 'firebase/firestore'
 import { vi } from 'date-fns/locale'
 import { db } from '../../firebase'
+import { ensureRevenueItemsForBooking } from '../../services/revenueSync'
 import BookingTooltip from './BookingTooltip'
 import type { Booking } from '../../types'
 
@@ -295,6 +296,13 @@ export default function CalendarGrid({
         status: nextStatus,
         updatedAt: new Date().toISOString(),
       })
+
+      if (nextStatus === 'checkedout') {
+        await ensureRevenueItemsForBooking({
+          ...booking,
+          status: nextStatus,
+        })
+      }
 
       setStatusOverrides((current) => ({
         ...current,
