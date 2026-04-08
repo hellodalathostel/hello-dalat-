@@ -7,6 +7,7 @@ import GroupBookingDetailPage from './pages/GroupBookingDetailPage'
 import GroupBookingsPage from './pages/GroupBookingsPage'
 import InvoicePage from './pages/InvoicePage'
 import LoginPage from './pages/LoginPage'
+import OverviewPage from './pages/OverviewPage'
 
 function PrivateLayout() {
   return (
@@ -17,6 +18,18 @@ function PrivateLayout() {
             <NavLink
               to="/"
               end
+              className={({ isActive }) =>
+                `rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`
+              }
+            >
+              Tổng quan
+            </NavLink>
+            <NavLink
+              to="/calendar"
               className={({ isActive }) =>
                 `rounded-xl px-3 py-2 text-sm font-medium transition ${
                   isActive
@@ -115,7 +128,8 @@ function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<PrivateLayout />}>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<OverviewPage />} />
+        <Route path="/calendar" element={<DashboardPage />} />
         <Route path="/finance" element={<FinancePage />} />
         <Route path="/invoices" element={<InvoicePage />} />
         <Route path="/group-bookings" element={<GroupBookingsPage />} />
