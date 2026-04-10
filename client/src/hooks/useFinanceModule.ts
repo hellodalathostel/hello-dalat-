@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 import {
   addDoc,
   collection,
@@ -62,15 +62,47 @@ function withCardSurcharge(amount: number, paymentMethod: 'cash' | 'card') {
   return paymentMethod === 'card' ? Math.round(base * 0.04) : 0
 }
 
+type FinanceModuleState = {
+  revenueItems: RevenueItem[]
+  expenses: ExpenseItem[]
+  loading: boolean
+  error: string | null
+}
+
+type FinanceModuleAction =
+  | { type: 'LOADING' }
+  | { type: 'REVENUE_SUCCESS'; items: RevenueItem[] }
+  | { type: 'EXPENSE_SUCCESS'; items: ExpenseItem[] }
+  | { type: 'REVENUE_ERROR'; error: string }
+  | { type: 'EXPENSE_ERROR'; error: string }
+
+function financeModuleReducer(state: FinanceModuleState, action: FinanceModuleAction): FinanceModuleState {
+  switch (action.type) {
+    case 'LOADING':
+      return { ...state, loading: true, error: null }
+    case 'REVENUE_SUCCESS':
+      return { ...state, revenueItems: action.items }
+    case 'EXPENSE_SUCCESS':
+      return { ...state, expenses: action.items, loading: false }
+    case 'REVENUE_ERROR':
+      return { ...state, revenueItems: [], error: action.error }
+    case 'EXPENSE_ERROR':
+      return { ...state, expenses: [], loading: false, error: action.error }
+    default:
+      return state
+  }
+}
+
 export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
-  const [revenueItems, setRevenueItems] = useState<RevenueItem[]>([])
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [state, dispatch] = useReducer(financeModuleReducer, {
+    revenueItems: [],
+    expenses: [],
+    loading: true,
+    error: null,
+  })
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    dispatch({ type: 'LOADING' })
 
     const revenueQuery = query(
       collection(db, 'revenue_items'),
@@ -86,15 +118,6 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       orderBy('date', 'desc'),
     )
 
-    let revenueReady = false
-    let expenseReady = false
-
-    const finalizeLoading = () => {
-      if (revenueReady && expenseReady) {
-        setLoading(false)
-      }
-    }
-
     const unsubscribeRevenue = onSnapshot(
       revenueQuery,
       (snapshot) => {
@@ -103,16 +126,11 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
           ...(d.data() as Omit<RevenueItem, 'id'>),
         }))
 
-        setRevenueItems(items)
-        revenueReady = true
-        finalizeLoading()
+        dispatch({ type: 'REVENUE_SUCCESS', items })
       },
       (snapshotError) => {
         console.error(snapshotError)
-        setError('Không thể tải doanh thu.')
-        setRevenueItems([])
-        revenueReady = true
-        finalizeLoading()
+        dispatch({ type: 'REVENUE_ERROR', error: 'Không thể tải doanh thu.' })
       },
     )
 
@@ -124,16 +142,11 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
           ...(d.data() as Omit<ExpenseItem, 'id'>),
         }))
 
-        setExpenses(items)
-        expenseReady = true
-        finalizeLoading()
+        dispatch({ type: 'EXPENSE_SUCCESS', items })
       },
       (snapshotError) => {
         console.error(snapshotError)
-        setError('Không thể tải chi phí.')
-        setExpenses([])
-        expenseReady = true
-        finalizeLoading()
+        dispatch({ type: 'EXPENSE_ERROR', error: 'Không thể tải chi phí.' })
       },
     )
 
@@ -144,16 +157,16 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
   }, [range.from, range.to])
 
   const totals = useMemo(() => {
-    const totalRevenuePaid = revenueItems
+    const totalRevenuePaid = state.revenueItems
       .filter((item) => item.status === 'paid')
       .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
 
-    const totalRevenueAll = revenueItems
+    const totalRevenueAll = state.revenueItems
       .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
 
-    const totalExpenses = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+    const totalExpenses = state.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
 
-    const outstandingDebt = revenueItems
+    const outstandingDebt = state.revenueItems
       .filter((item) => item.status === 'unpaid')
       .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
 
@@ -164,7 +177,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       outstandingDebt,
       netProfit: totalRevenuePaid - totalExpenses,
     }
-  }, [revenueItems, expenses])
+  }, [state.revenueItems, state.expenses])
 
   async function addRevenueItem(input: CreateRevenueInput) {
     const amount = Math.max(0, Math.round(input.amount || 0))
@@ -220,7 +233,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
   }
 
   async function markRevenuePaid(id: string, method: 'cash' | 'card') {
-    const target = revenueItems.find((item) => item.id === id)
+    const target = state.revenueItems.find((item) => item.id === id)
     const amount = Number(target?.amount || 0)
 
     await updateDoc(doc(db, 'revenue_items', id), {
@@ -232,10 +245,10 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
   }
 
   return {
-    revenueItems,
-    expenses,
-    loading,
-    error,
+    revenueItems: state.revenueItems,
+    expenses: state.expenses,
+    loading: state.loading,
+    error: state.error,
     totalRevenuePaid: totals.totalRevenuePaid,
     totalRevenueAll: totals.totalRevenueAll,
     totalExpenses: totals.totalExpenses,

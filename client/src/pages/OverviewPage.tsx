@@ -148,9 +148,10 @@ export default function OverviewPage() {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={3} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                   <Tooltip
-                    formatter={(value: number, _name: string, payload: { payload?: { occupiedRooms?: number } }) => {
-                      const occupiedRooms = payload?.payload?.occupiedRooms ?? 0
-                      return [`${value}% (${occupiedRooms}/8 phòng)`, 'Công suất']
+                    formatter={(value, _name, payload) => {
+                      const numValue = typeof value === 'number' ? value : 0
+                      const occupiedRooms = (payload?.payload as { occupiedRooms?: number } | undefined)?.occupiedRooms ?? 0
+                      return [`${numValue}% (${occupiedRooms}/8 phòng)`, 'Công suất']
                     }}
                   />
                   <Bar dataKey="occupancyRate" radius={[6, 6, 0, 0]}>
@@ -182,7 +183,7 @@ export default function OverviewPage() {
                       <Cell key={entry.category} fill={pieColors[index % pieColors.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [formatMoney(value), 'Doanh thu']} />
+                  <Tooltip formatter={(value) => [formatMoney(typeof value === 'number' ? value : 0), 'Doanh thu']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

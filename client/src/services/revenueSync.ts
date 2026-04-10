@@ -1,4 +1,4 @@
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore'
 import type { Booking } from '../types'
 import { db } from '../firebase'
 import { buildLineItems } from '../utils/buildLineItems.js'
@@ -38,6 +38,9 @@ export async function ensureRevenueItemsForBooking(booking: Booking) {
   const now = new Date().toISOString()
   const lineItems = buildLineItems(booking)
 
+  const batch = writeBatch(db)
+  let hasNewItems = false
+
   for (const item of lineItems) {
     if (!item || Number(item.total || 0) <= 0) {
       continue
@@ -54,7 +57,8 @@ export async function ensureRevenueItemsForBooking(booking: Booking) {
     const amount = Math.max(0, Math.round(Number(item.total) || 0))
     const card_surcharge = payment_method === 'card' ? Math.round(amount * 0.04) : 0
 
-    await addDoc(collection(db, 'revenue_items'), {
+    const newDocRef = doc(collection(db, 'revenue_items'))
+    batch.set(newDocRef, {
       booking_id: booking.id,
       group_booking_id: booking.group_booking_id ?? booking.groupBookingId ?? null,
       room_id: booking.roomId,
@@ -69,5 +73,10 @@ export async function ensureRevenueItemsForBooking(booking: Booking) {
       created_at: now,
       updated_at: now,
     })
+    hasNewItems = true
+  }
+
+  if (hasNewItems) {
+    await batch.commit()
   }
 }

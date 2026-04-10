@@ -1,6 +1,6 @@
 import { eachDayOfInterval, endOfMonth, format, startOfMonth, subDays } from 'date-fns'
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import { db } from '../firebase'
 import type { Booking, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
 
@@ -64,12 +64,31 @@ function sortBookingsByRoom(items: Booking[]) {
   return [...items].sort((a, b) => a.roomId.localeCompare(b.roomId))
 }
 
+type OverviewStatus = { loading: boolean; error: string | null }
+type OverviewStatusAction =
+  | { type: 'INIT' }
+  | { type: 'READY' }
+  | { type: 'ERROR'; message: string }
+
+function statusReducer(_state: OverviewStatus, action: OverviewStatusAction): OverviewStatus {
+  switch (action.type) {
+    case 'INIT':
+      return { loading: true, error: null }
+    case 'READY':
+      return { loading: false, error: null }
+    case 'ERROR':
+      return { loading: false, error: action.message }
+    default:
+      return _state
+  }
+}
+
 export function useOverviewData(): UseOverviewDataResult {
-  const todayDate = new Date()
-  const today = format(todayDate, 'yyyy-MM-dd')
-  const monthStart = format(startOfMonth(todayDate), 'yyyy-MM-dd')
-  const monthEnd = format(endOfMonth(todayDate), 'yyyy-MM-dd')
-  const thirtyDaysStart = format(subDays(todayDate, 29), 'yyyy-MM-dd')
+  const todayDate = useMemo(() => new Date(), [])
+  const today = useMemo(() => format(todayDate, 'yyyy-MM-dd'), [todayDate])
+  const monthStart = useMemo(() => format(startOfMonth(todayDate), 'yyyy-MM-dd'), [todayDate])
+  const monthEnd = useMemo(() => format(endOfMonth(todayDate), 'yyyy-MM-dd'), [todayDate])
+  const thirtyDaysStart = useMemo(() => format(subDays(todayDate, 29), 'yyyy-MM-dd'), [todayDate])
 
   const [rangeBookings, setRangeBookings] = useState<Booking[]>([])
   const [monthRevenue, setMonthRevenue] = useState<RevenueItem[]>([])
@@ -77,12 +96,10 @@ export function useOverviewData(): UseOverviewDataResult {
   const [unpaidRevenue, setUnpaidRevenue] = useState<RevenueItem[]>([])
   const [checkInsToday, setCheckInsToday] = useState<Booking[]>([])
   const [checkOutsToday, setCheckOutsToday] = useState<Booking[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [{ loading, error }, dispatch] = useReducer(statusReducer, { loading: true, error: null })
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    dispatch({ type: 'INIT' })
 
     const ready = {
       range: false,
@@ -95,7 +112,7 @@ export function useOverviewData(): UseOverviewDataResult {
 
     const finishIfReady = () => {
       if (Object.values(ready).every(Boolean)) {
-        setLoading(false)
+        dispatch({ type: 'READY' })
       }
     }
 
@@ -119,7 +136,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setRangeBookings([])
-        setError('Không thể tải dữ liệu công suất phòng.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu công suất phòng.' })
         ready.range = true
         finishIfReady()
       },
@@ -144,7 +161,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setMonthRevenue([])
-        setError('Không thể tải dữ liệu doanh thu.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu doanh thu.' })
         ready.revenue = true
         finishIfReady()
       },
@@ -169,7 +186,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setMonthExpenses([])
-        setError('Không thể tải dữ liệu chi phí.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu chi phí.' })
         ready.expenses = true
         finishIfReady()
       },
@@ -190,7 +207,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setUnpaidRevenue([])
-        setError('Không thể tải dữ liệu công nợ.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu công nợ.' })
         ready.unpaid = true
         finishIfReady()
       },
@@ -211,7 +228,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setCheckInsToday([])
-        setError('Không thể tải danh sách check-in hôm nay.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải danh sách check-in hôm nay.' })
         ready.checkIn = true
         finishIfReady()
       },
@@ -232,7 +249,7 @@ export function useOverviewData(): UseOverviewDataResult {
       (snapshotError) => {
         console.error(snapshotError)
         setCheckOutsToday([])
-        setError('Không thể tải danh sách check-out hôm nay.')
+        dispatch({ type: 'ERROR', message: 'Không thể tải danh sách check-out hôm nay.' })
         ready.checkOut = true
         finishIfReady()
       },
