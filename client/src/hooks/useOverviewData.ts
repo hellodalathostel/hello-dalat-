@@ -1,4 +1,4 @@
-import { eachDayOfInterval, endOfMonth, format, startOfMonth, subDays } from 'date-fns'
+import { eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth, subDays } from 'date-fns'
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { db } from '../firebase'
@@ -84,11 +84,13 @@ function statusReducer(_state: OverviewStatus, action: OverviewStatusAction): Ov
 }
 
 export function useOverviewData(): UseOverviewDataResult {
-  const todayDate = useMemo(() => new Date(), [])
-  const today = useMemo(() => format(todayDate, 'yyyy-MM-dd'), [todayDate])
-  const monthStart = useMemo(() => format(startOfMonth(todayDate), 'yyyy-MM-dd'), [todayDate])
-  const monthEnd = useMemo(() => format(endOfMonth(todayDate), 'yyyy-MM-dd'), [todayDate])
-  const thirtyDaysStart = useMemo(() => format(subDays(todayDate, 29), 'yyyy-MM-dd'), [todayDate])
+  // Compute date strings from current date - strings are stable within the same day
+  // and update naturally on the next render after midnight
+  const todayDate = new Date()
+  const today = format(todayDate, 'yyyy-MM-dd')
+  const monthStart = format(startOfMonth(todayDate), 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(todayDate), 'yyyy-MM-dd')
+  const thirtyDaysStart = format(subDays(todayDate, 29), 'yyyy-MM-dd')
 
   const [rangeBookings, setRangeBookings] = useState<Booking[]>([])
   const [monthRevenue, setMonthRevenue] = useState<RevenueItem[]>([])
@@ -267,8 +269,8 @@ export function useOverviewData(): UseOverviewDataResult {
 
   const occupancySeries = useMemo(() => {
     const dates = eachDayOfInterval({
-      start: subDays(todayDate, 29),
-      end: todayDate,
+      start: parseISO(thirtyDaysStart),
+      end: parseISO(today),
     })
 
     return dates.map((date) => {
@@ -286,7 +288,7 @@ export function useOverviewData(): UseOverviewDataResult {
         occupancyRate: Number(((occupiedRooms / TOTAL_ROOMS) * 100).toFixed(1)),
       }
     })
-  }, [rangeBookings, todayDate])
+  }, [rangeBookings, today, thirtyDaysStart])
 
   const metrics = useMemo<OverviewMetrics>(() => {
     const todayOccupied = new Set(
