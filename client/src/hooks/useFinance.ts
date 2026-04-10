@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 import {
   collection,
   onSnapshot,
@@ -18,14 +18,39 @@ interface UseFinanceResult {
   netProfit: number
 }
 
+type FinanceState = {
+  entries: FinanceEntry[]
+  loading: boolean
+  error: string | null
+}
+
+type FinanceAction =
+  | { type: 'LOADING' }
+  | { type: 'SUCCESS'; entries: FinanceEntry[] }
+  | { type: 'ERROR'; error: string }
+
+function financeReducer(state: FinanceState, action: FinanceAction): FinanceState {
+  switch (action.type) {
+    case 'LOADING':
+      return { ...state, loading: true, error: null }
+    case 'SUCCESS':
+      return { loading: false, error: null, entries: action.entries }
+    case 'ERROR':
+      return { loading: false, error: action.error, entries: [] }
+    default:
+      return state
+  }
+}
+
 export function useFinance(month: string): UseFinanceResult {
-  const [entries, setEntries] = useState<FinanceEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [state, dispatch] = useReducer(financeReducer, {
+    entries: [],
+    loading: true,
+    error: null,
+  })
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    dispatch({ type: 'LOADING' })
 
     const financeQuery = query(
       collection(db, 'financeEntries'),
@@ -44,14 +69,11 @@ export function useFinance(month: string): UseFinanceResult {
           }))
           .sort((left, right) => right.date.localeCompare(left.date))
 
-        setEntries(nextEntries)
-        setLoading(false)
+        dispatch({ type: 'SUCCESS', entries: nextEntries })
       },
       (snapshotError) => {
         console.error(snapshotError)
-        setError('Không thể tải dữ liệu tài chính.')
-        setEntries([])
-        setLoading(false)
+        dispatch({ type: 'ERROR', error: 'Không thể tải dữ liệu tài chính.' })
       },
     )
 
@@ -62,7 +84,7 @@ export function useFinance(month: string): UseFinanceResult {
     let income = 0
     let expense = 0
 
-    entries.forEach((entry) => {
+    state.entries.forEach((entry) => {
       if (entry.type === 'income') {
         income += entry.amount
         return
@@ -72,12 +94,12 @@ export function useFinance(month: string): UseFinanceResult {
     })
 
     return { totalIncome: income, totalExpense: expense }
-  }, [entries])
+  }, [state.entries])
 
   return {
-    entries,
-    loading,
-    error,
+    entries: state.entries,
+    loading: state.loading,
+    error: state.error,
     totalIncome,
     totalExpense,
     netProfit: totalIncome - totalExpense,

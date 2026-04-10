@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react'
 import { useGroupBookings } from '../hooks/useGroupBookings'
@@ -47,7 +47,7 @@ export default function GroupBookingDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [billPaymentMethod, setBillPaymentMethod] = useState<'cash' | 'card'>('cash')
 
-  async function loadDetail() {
+  const loadDetail = useCallback(async () => {
     if (!groupId) {
       return
     }
@@ -71,11 +71,11 @@ export default function GroupBookingDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [groupId, getGroupBookingDetail])
 
   useEffect(() => {
     void loadDetail()
-  }, [groupId])
+  }, [loadDetail])
 
   const rows = useMemo(
     () =>

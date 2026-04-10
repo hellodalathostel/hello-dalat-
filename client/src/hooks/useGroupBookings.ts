@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   addDoc,
   collection,
@@ -81,7 +81,7 @@ export function useGroupBookings(): UseGroupBookingsResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -111,13 +111,13 @@ export function useGroupBookings(): UseGroupBookingsResult {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void fetchData()
-  }, [])
+  }, [fetchData])
 
-  async function createGroupBooking(input: CreateGroupBookingInput) {
+  const createGroupBooking = useCallback(async (input: CreateGroupBookingInput) => {
     const now = new Date().toISOString()
     const createdGroup = await addDoc(collection(db, 'group_bookings'), {
       group_name: input.groupName.trim(),
@@ -183,9 +183,9 @@ export function useGroupBookings(): UseGroupBookingsResult {
     await fetchData()
 
     return createdGroup.id
-  }
+  }, [fetchData])
 
-  async function getGroupBookingDetail(groupId: string): Promise<GroupBookingWithRooms | null> {
+  const getGroupBookingDetail = useCallback(async (groupId: string): Promise<GroupBookingWithRooms | null> => {
     const groupRef = doc(db, 'group_bookings', groupId)
     const groupDoc = await getDoc(groupRef)
 
@@ -217,9 +217,9 @@ export function useGroupBookings(): UseGroupBookingsResult {
       },
       rooms,
     }
-  }
+  }, [])
 
-  async function syncGroupStatus(groupId: string) {
+  const syncGroupStatus = useCallback(async (groupId: string) => {
     const linkedBookingsSnapshot = await getDocs(
       query(collection(db, 'bookings'), where('group_booking_id', '==', groupId)),
     )
@@ -233,9 +233,9 @@ export function useGroupBookings(): UseGroupBookingsResult {
       status: toGroupStatus(linkedBookings),
       updatedAt: new Date().toISOString(),
     })
-  }
+  }, [])
 
-  async function updateSingleBookingStatus(groupId: string, bookingId: string, status: Booking['status']) {
+  const updateSingleBookingStatus = useCallback(async (groupId: string, bookingId: string, status: Booking['status']) => {
     await updateDoc(doc(db, 'bookings', bookingId), {
       status,
       updatedAt: new Date().toISOString(),
@@ -243,9 +243,9 @@ export function useGroupBookings(): UseGroupBookingsResult {
 
     await syncGroupStatus(groupId)
     await fetchData()
-  }
+  }, [fetchData, syncGroupStatus])
 
-  async function cancelGroupBooking(groupId: string) {
+  const cancelGroupBooking = useCallback(async (groupId: string) => {
     const linkedBookingsSnapshot = await getDocs(
       query(collection(db, 'bookings'), where('group_booking_id', '==', groupId)),
     )
@@ -265,7 +265,7 @@ export function useGroupBookings(): UseGroupBookingsResult {
 
     await batch.commit()
     await fetchData()
-  }
+  }, [fetchData])
 
   return useMemo(
     () => ({
@@ -279,6 +279,6 @@ export function useGroupBookings(): UseGroupBookingsResult {
       cancelGroupBooking,
       refetch: fetchData,
     }),
-    [groups, bookings, loading, error],
+    [groups, bookings, loading, error, createGroupBooking, getGroupBookingDetail, updateSingleBookingStatus, cancelGroupBooking, fetchData],
   )
 }

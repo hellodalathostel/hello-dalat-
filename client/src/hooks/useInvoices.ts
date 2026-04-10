@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   addDoc,
   collection,
@@ -14,7 +14,7 @@ import {
 import { db } from '../firebase'
 import type { Invoice } from '../types'
 
-interface CreateInvoiceInput extends Omit<Invoice, 'id' | 'invoiceNumber' | 'createdAt'> {}
+type CreateInvoiceInput = Omit<Invoice, 'id' | 'invoiceNumber' | 'createdAt'>
 
 interface UseInvoicesResult {
   invoices: Invoice[]
@@ -44,7 +44,7 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function fetchInvoices() {
+  const fetchInvoices = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -68,18 +68,18 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
       setInvoices(nextInvoices)
     } catch (fetchError) {
       console.error(fetchError)
-      setError('Khong the tai danh sach hoa don.')
+      setError('Không thể tải danh sách hóa đơn.')
       setInvoices([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [month, statusFilter])
 
   useEffect(() => {
     void fetchInvoices()
-  }, [month, statusFilter])
+  }, [fetchInvoices])
 
-  async function getNextInvoiceNumber() {
+  const getNextInvoiceNumber = useCallback(async () => {
     const year = getYear()
     const startDate = `${year}-01-01`
     const endDate = `${year}-12-31`
@@ -104,9 +104,9 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
 
     const nextCounter = String(maxCounter + 1).padStart(4, '0')
     return `HD${year}-${nextCounter}`
-  }
+  }, [])
 
-  async function createInvoice(data: CreateInvoiceInput): Promise<Invoice> {
+  const createInvoice = useCallback(async (data: CreateInvoiceInput): Promise<Invoice> => {
     const invoiceNumber = await getNextInvoiceNumber()
     const payload = {
       ...data,
@@ -123,17 +123,17 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
       invoiceNumber,
       createdAt: serverTimestamp() as never,
     }
-  }
+  }, [fetchInvoices, getNextInvoiceNumber])
 
-  async function updateInvoiceById(id: string, data: Partial<Invoice>) {
+  const updateInvoiceById = useCallback(async (id: string, data: Partial<Invoice>) => {
     await updateDoc(doc(db, 'invoices', id), data)
     await fetchInvoices()
-  }
+  }, [fetchInvoices])
 
-  async function deleteInvoiceById(id: string) {
+  const deleteInvoiceById = useCallback(async (id: string) => {
     await deleteDoc(doc(db, 'invoices', id))
     await fetchInvoices()
-  }
+  }, [fetchInvoices])
 
   const value = useMemo(
     () => ({
@@ -146,7 +146,7 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
       getNextInvoiceNumber,
       refetch: fetchInvoices,
     }),
-    [invoices, loading, error],
+    [invoices, loading, error, createInvoice, updateInvoiceById, deleteInvoiceById, getNextInvoiceNumber, fetchInvoices],
   )
 
   return value
