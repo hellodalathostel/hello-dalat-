@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { Booking, GroupBooking } from '../types'
+import { mapBookingFromDb, mapGroupBookingFromDb, type DbBooking, type DbGroupBooking } from '../utils/firestoreMappers'
 
 export interface GroupBookingRoomInput {
   roomId: string
@@ -92,13 +93,11 @@ export function useGroupBookings(): UseGroupBookingsResult {
       ])
 
       const nextGroups = groupSnapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<GroupBooking, 'id'>),
+        ...mapGroupBookingFromDb(item.id, item.data() as DbGroupBooking),
       }))
 
       const nextBookings = bookingSnapshot.docs.map((item) => ({
-        id: item.id,
-        ...(item.data() as Omit<Booking, 'id'>),
+        ...mapBookingFromDb(item.id, item.data() as DbBooking),
       }))
 
       setGroups(nextGroups)
@@ -122,7 +121,6 @@ export function useGroupBookings(): UseGroupBookingsResult {
     const createdGroup = await addDoc(collection(db, 'group_bookings'), {
       group_name: input.groupName.trim(),
       created_at: now,
-      createdAt: now,
       status: 'confirmed',
       note: input.note?.trim() || '',
     })
@@ -140,7 +138,6 @@ export function useGroupBookings(): UseGroupBookingsResult {
       const bookingRef = doc(collection(db, 'bookings'))
       batch.set(bookingRef, {
         group_booking_id: createdGroup.id,
-        groupBookingId: createdGroup.id,
         roomId: room.roomId,
         guestName: input.groupName.trim(),
         guestPhone: '',
@@ -198,8 +195,7 @@ export function useGroupBookings(): UseGroupBookingsResult {
     )
 
     const rooms = roomsSnapshot.docs.map((item) => ({
-      id: item.id,
-      ...(item.data() as Omit<Booking, 'id'>),
+      ...mapBookingFromDb(item.id, item.data() as DbBooking),
     }))
       .sort((left, right) => {
         const byCheckIn = left.checkIn.localeCompare(right.checkIn)
@@ -212,8 +208,7 @@ export function useGroupBookings(): UseGroupBookingsResult {
 
     return {
       group: {
-        id: groupDoc.id,
-        ...(groupDoc.data() as Omit<GroupBooking, 'id'>),
+        ...mapGroupBookingFromDb(groupDoc.id, groupDoc.data() as DbGroupBooking),
       },
       rooms,
     }
@@ -225,8 +220,7 @@ export function useGroupBookings(): UseGroupBookingsResult {
     )
 
     const linkedBookings = linkedBookingsSnapshot.docs.map((item) => ({
-      id: item.id,
-      ...(item.data() as Omit<Booking, 'id'>),
+      ...mapBookingFromDb(item.id, item.data() as DbBooking),
     }))
 
     await updateDoc(doc(db, 'group_bookings', groupId), {

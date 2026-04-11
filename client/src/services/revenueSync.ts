@@ -2,6 +2,7 @@ import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/fir
 import type { Booking } from '../types'
 import { db } from '../firebase'
 import { buildLineItems } from '../utils/buildLineItems.js'
+import { mapRevenueItemToDb } from '../utils/firestoreMappers'
 
 function normalizeCategory(label: string) {
   const lowered = label.toLowerCase()
@@ -32,7 +33,7 @@ export async function ensureRevenueItemsForBooking(booking: Booking) {
     }),
   )
 
-  const payment_method = booking.paymentMethod === 'card' ? 'card' : 'cash'
+  const paymentMethod = booking.paymentMethod === 'card' ? 'card' : 'cash'
   const status = booking.paymentStatus === 'paid' ? 'paid' : 'unpaid'
   const date = booking.checkOut || booking.checkIn
   const now = new Date().toISOString()
@@ -55,24 +56,24 @@ export async function ensureRevenueItemsForBooking(booking: Booking) {
     }
 
     const amount = Math.max(0, Math.round(Number(item.total) || 0))
-    const card_surcharge = payment_method === 'card' ? Math.round(amount * 0.04) : 0
+    const cardSurcharge = paymentMethod === 'card' ? Math.round(amount * 0.04) : 0
 
     const newDocRef = doc(collection(db, 'revenue_items'))
-    batch.set(newDocRef, {
-      booking_id: booking.id,
-      group_booking_id: booking.group_booking_id ?? booking.groupBookingId ?? null,
-      room_id: booking.roomId,
-      guest_name: booking.guestName,
+    batch.set(newDocRef, mapRevenueItemToDb({
+      bookingId: booking.id,
+      groupBookingId: booking.groupBookingId ?? null,
+      roomId: booking.roomId,
+      guestName: booking.guestName,
       date,
       category,
       description,
       amount,
-      payment_method,
-      card_surcharge,
+      paymentMethod,
+      cardSurcharge,
       status,
-      created_at: now,
-      updated_at: now,
-    })
+      createdAt: now,
+      updatedAt: now,
+    }))
     hasNewItems = true
   }
 

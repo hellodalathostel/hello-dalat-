@@ -3,6 +3,14 @@ import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestor
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { db } from '../firebase'
 import type { Booking, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
+import {
+  type DbBooking,
+  mapBookingFromDb,
+  mapExpenseItemFromDb,
+  mapRevenueItemFromDb,
+  type DbExpenseItem,
+  type DbRevenueItem,
+} from '../utils/firestoreMappers'
 
 interface OccupancyPoint {
   date: string
@@ -57,7 +65,7 @@ function includesDate(booking: Booking, date: string) {
 }
 
 function revenueTotal(item: RevenueItem) {
-  return Number(item.amount || 0) + Number(item.card_surcharge || 0)
+  return Number(item.amount || 0) + Number(item.cardSurcharge || 0)
 }
 
 function sortBookingsByRoom(items: Booking[]) {
@@ -127,10 +135,7 @@ export function useOverviewData(): UseOverviewDataResult {
       ),
       (snapshot) => {
         setRangeBookings(
-          snapshot.docs.map((document) => ({
-            id: document.id,
-            ...(document.data() as Omit<Booking, 'id'>),
-          })),
+          snapshot.docs.map((document) => mapBookingFromDb(document.id, document.data() as DbBooking)),
         )
         ready.range = true
         finishIfReady()
@@ -152,10 +157,7 @@ export function useOverviewData(): UseOverviewDataResult {
       ),
       (snapshot) => {
         setMonthRevenue(
-          snapshot.docs.map((document) => ({
-            id: document.id,
-            ...(document.data() as Omit<RevenueItem, 'id'>),
-          })),
+          snapshot.docs.map((document) => mapRevenueItemFromDb(document.id, document.data() as DbRevenueItem)),
         )
         ready.revenue = true
         finishIfReady()
@@ -177,10 +179,7 @@ export function useOverviewData(): UseOverviewDataResult {
       ),
       (snapshot) => {
         setMonthExpenses(
-          snapshot.docs.map((document) => ({
-            id: document.id,
-            ...(document.data() as Omit<ExpenseItem, 'id'>),
-          })),
+          snapshot.docs.map((document) => mapExpenseItemFromDb(document.id, document.data() as DbExpenseItem)),
         )
         ready.expenses = true
         finishIfReady()
@@ -198,10 +197,7 @@ export function useOverviewData(): UseOverviewDataResult {
       query(collection(db, 'revenue_items'), where('status', '==', 'unpaid')),
       (snapshot) => {
         setUnpaidRevenue(
-          snapshot.docs.map((document) => ({
-            id: document.id,
-            ...(document.data() as Omit<RevenueItem, 'id'>),
-          })),
+          snapshot.docs.map((document) => mapRevenueItemFromDb(document.id, document.data() as DbRevenueItem)),
         )
         ready.unpaid = true
         finishIfReady()
@@ -219,8 +215,7 @@ export function useOverviewData(): UseOverviewDataResult {
       query(collection(db, 'bookings'), where('checkIn', '==', today)),
       (snapshot) => {
         const items = snapshot.docs.map((document) => ({
-          id: document.id,
-          ...(document.data() as Omit<Booking, 'id'>),
+          ...mapBookingFromDb(document.id, document.data() as DbBooking),
         }))
 
         setCheckInsToday(sortBookingsByRoom(items))
@@ -240,8 +235,7 @@ export function useOverviewData(): UseOverviewDataResult {
       query(collection(db, 'bookings'), where('checkOut', '==', today)),
       (snapshot) => {
         const items = snapshot.docs.map((document) => ({
-          id: document.id,
-          ...(document.data() as Omit<Booking, 'id'>),
+          ...mapBookingFromDb(document.id, document.data() as DbBooking),
         }))
 
         setCheckOutsToday(sortBookingsByRoom(items))

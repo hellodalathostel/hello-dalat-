@@ -12,6 +12,14 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { ExpenseCategoryV2, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
+import {
+  mapExpenseItemFromDb,
+  mapExpenseItemToDb,
+  mapRevenueItemFromDb,
+  mapRevenueItemToDb,
+  type DbExpenseItem,
+  type DbRevenueItem,
+} from '../utils/firestoreMappers'
 
 export interface FinanceRange {
   from: string
@@ -19,15 +27,15 @@ export interface FinanceRange {
 }
 
 interface CreateRevenueInput {
-  booking_id?: string | null
-  group_booking_id?: string | null
-  room_id?: string | null
-  guest_name?: string
+  bookingId?: string | null
+  groupBookingId?: string | null
+  roomId?: string | null
+  guestName?: string
   date: string
   category: RevenueCategory
   description: string
   amount: number
-  payment_method: 'cash' | 'card'
+  paymentMethod: 'cash' | 'card'
   status: 'paid' | 'unpaid'
 }
 
@@ -36,7 +44,7 @@ interface CreateExpenseInput {
   category: ExpenseCategoryV2
   description: string
   amount: number
-  paid_by?: string
+  paidBy?: string
   note?: string
 }
 
@@ -154,8 +162,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       revenueQuery,
       (snapshot) => {
         const items = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<RevenueItem, 'id'>),
+          ...mapRevenueItemFromDb(d.id, d.data() as DbRevenueItem),
         }))
 
         dispatch({ type: 'REVENUE_SUCCESS', items })
@@ -170,8 +177,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       expenseQuery,
       (snapshot) => {
         const items = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<ExpenseItem, 'id'>),
+          ...mapExpenseItemFromDb(d.id, d.data() as DbExpenseItem),
         }))
 
         dispatch({ type: 'EXPENSE_SUCCESS', items })
@@ -191,16 +197,16 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
   const totals = useMemo(() => {
     const totalRevenuePaid = state.revenueItems
       .filter((item) => item.status === 'paid')
-      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
+      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.cardSurcharge || 0), 0)
 
     const totalRevenueAll = state.revenueItems
-      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
+      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.cardSurcharge || 0), 0)
 
     const totalExpenses = state.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
 
     const outstandingDebt = state.revenueItems
       .filter((item) => item.status === 'unpaid')
-      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.card_surcharge || 0), 0)
+      .reduce((sum, item) => sum + Number(item.amount || 0) + Number(item.cardSurcharge || 0), 0)
 
     return {
       totalRevenuePaid,
@@ -213,39 +219,39 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
 
   async function addRevenueItem(input: CreateRevenueInput) {
     const amount = Math.max(0, Math.round(input.amount || 0))
-    const card_surcharge = withCardSurcharge(amount, input.payment_method)
+    const cardSurcharge = withCardSurcharge(amount, input.paymentMethod)
     const now = new Date().toISOString()
 
-    await addDoc(collection(db, 'revenue_items'), {
-      booking_id: input.booking_id ?? null,
-      group_booking_id: input.group_booking_id ?? null,
-      room_id: input.room_id ?? null,
-      guest_name: input.guest_name ?? '',
+    await addDoc(collection(db, 'revenue_items'), mapRevenueItemToDb({
+      bookingId: input.bookingId ?? null,
+      groupBookingId: input.groupBookingId ?? null,
+      roomId: input.roomId ?? null,
+      guestName: input.guestName ?? '',
       date: input.date,
       category: input.category,
       description: input.description.trim(),
       amount,
-      payment_method: input.payment_method,
-      card_surcharge,
+      paymentMethod: input.paymentMethod,
+      cardSurcharge,
       status: input.status,
-      created_at: now,
-      updated_at: now,
-    })
+      createdAt: now,
+      updatedAt: now,
+    }))
   }
 
   async function addExpense(input: CreateExpenseInput) {
     const now = new Date().toISOString()
 
-    await addDoc(collection(db, 'expenses'), {
+    await addDoc(collection(db, 'expenses'), mapExpenseItemToDb({
       date: input.date,
       category: input.category,
       description: input.description.trim(),
       amount: Math.max(0, Math.round(input.amount || 0)),
-      paid_by: input.paid_by?.trim() || '',
+      paidBy: input.paidBy?.trim() || '',
       note: input.note?.trim() || '',
-      created_at: now,
-      updated_at: now,
-    })
+      createdAt: now,
+      updatedAt: now,
+    }))
   }
 
   async function updateExpense(id: string, input: Partial<CreateExpenseInput>) {
@@ -254,7 +260,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       ...(input.category ? { category: input.category } : {}),
       ...(input.description !== undefined ? { description: input.description.trim() } : {}),
       ...(input.amount !== undefined ? { amount: Math.max(0, Math.round(input.amount || 0)) } : {}),
-      ...(input.paid_by !== undefined ? { paid_by: input.paid_by.trim() } : {}),
+      ...(input.paidBy !== undefined ? { paid_by: input.paidBy.trim() } : {}),
       ...(input.note !== undefined ? { note: input.note.trim() } : {}),
       updated_at: new Date().toISOString(),
     })

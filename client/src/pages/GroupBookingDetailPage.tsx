@@ -141,8 +141,8 @@ export default function GroupBookingDetailPage() {
             <>
               <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-semibold text-slate-900">{group.group_name}</h1>
-                  <p className="mt-2 text-sm text-slate-500">Tạo lúc: {group.created_at}</p>
+                  <h1 className="text-3xl font-semibold text-slate-900">{group.groupName}</h1>
+                  <p className="mt-2 text-sm text-slate-500">Tạo lúc: {group.createdAt}</p>
                   {group.note ? <p className="mt-1 text-sm text-slate-600">Ghi chú: {group.note}</p> : null}
                 </div>
                 <span className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">

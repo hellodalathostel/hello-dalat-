@@ -73,6 +73,8 @@ function toPaymentLabel(method) {
 }
 
 export function buildGroupBillHtml(group, rooms, paymentMethod = 'cash') {
+  const groupName = group.groupName || group.group_name || ''
+  const groupCreatedAt = group.createdAt || group.created_at || ''
   const subtotal = rooms.reduce((sum, room) => {
     const roomTotal = buildLineItems(room).reduce(
       (itemSum, item) => itemSum + (Number(item.total) || 0),
@@ -85,14 +87,14 @@ export function buildGroupBillHtml(group, rooms, paymentMethod = 'cash') {
   const grandTotal = subtotal + cardFee
   const amountDue = Math.max(0, grandTotal - totalDeposit)
   const payment = toPaymentLabel(paymentMethod)
-  const transferNote = `BILLDOAN ${group.group_name || ''}`.trim()
+  const transferNote = `BILLDOAN ${groupName}`.trim()
 
   const bodyHTML = `
     ${renderHeader('GROUP BILL', [`Tax ID: ${hostelConfig.tax_id}`], 'Hóa đơn đoàn')}
 
     <div class="info-grid" style="margin-bottom: 16px;">
-      ${renderInfoItem('Group Name', 'Tên đoàn', group.group_name || '')}
-      ${renderInfoItem('Created Date', 'Ngày tạo', group.created_at || '')}
+      ${renderInfoItem('Group Name', 'Tên đoàn', groupName)}
+      ${renderInfoItem('Created Date', 'Ngày tạo', groupCreatedAt)}
       ${renderInfoItem('Payment Method', 'Phương thức thanh toán', `${payment.en} | ${payment.vi}`)}
       ${renderInfoItem('Room Count', 'Số phòng', String(rooms.length))}
     </div>
@@ -171,7 +173,7 @@ export function buildGroupBillHtml(group, rooms, paymentMethod = 'cash') {
     </div>
   `
 
-  return buildDocument(`Group Bill ${group.group_name || ''}`, bodyHTML)
+  return buildDocument(`Group Bill ${groupName}`, bodyHTML)
 }
 
 export function openGroupBill(group, rooms, paymentMethod = 'cash') {

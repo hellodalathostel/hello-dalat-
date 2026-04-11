@@ -393,12 +393,12 @@ export default function GroupBookingsPage() {
                   className="block rounded-xl border border-slate-200 bg-[#fffefb] px-4 py-3 transition hover:border-primary/25 hover:bg-[#faf8f1]"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-slate-900">{group.group_name}</p>
+                    <p className="font-semibold text-slate-900">{group.groupName}</p>
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                       {statusLabel(group.status)}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">Tạo lúc: {group.created_at}</p>
+                  <p className="mt-1 text-xs text-slate-500">Tạo lúc: {group.createdAt}</p>
                 </Link>
               ))
             )}

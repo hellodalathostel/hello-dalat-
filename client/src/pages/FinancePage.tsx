@@ -40,7 +40,7 @@ interface RevenueForm {
   category: RevenueCategory
   description: string
   amount: number
-  payment_method: 'cash' | 'card'
+  paymentMethod: 'cash' | 'card'
   status: 'paid' | 'unpaid'
 }
 
@@ -49,7 +49,7 @@ interface ExpenseForm {
   category: ExpenseCategoryV2
   description: string
   amount: number
-  paid_by: string
+  paidBy: string
   note: string
 }
 
@@ -62,7 +62,7 @@ function getExpenseLabel(category: ExpenseCategoryV2) {
 }
 
 function revenueTotal(item: RevenueItem) {
-  return Number(item.amount || 0) + Number(item.card_surcharge || 0)
+  return Number(item.amount || 0) + Number(item.cardSurcharge || 0)
 }
 
 export default function FinancePage() {
@@ -98,7 +98,7 @@ export default function FinancePage() {
     category: 'other',
     description: '',
     amount: 0,
-    payment_method: 'cash',
+    paymentMethod: 'cash',
     status: 'paid',
   })
 
@@ -107,7 +107,7 @@ export default function FinancePage() {
     category: 'supplies',
     description: '',
     amount: 0,
-    paid_by: '',
+    paidBy: '',
     note: '',
   })
 
@@ -168,7 +168,7 @@ export default function FinancePage() {
       category: revenueForm.category,
       description: revenueForm.description,
       amount: revenueForm.amount,
-      payment_method: revenueForm.payment_method,
+      paymentMethod: revenueForm.paymentMethod,
       status: revenueForm.status,
     })
 
@@ -190,7 +190,7 @@ export default function FinancePage() {
       ...current,
       description: '',
       amount: 0,
-      paid_by: '',
+      paidBy: '',
       note: '',
     }))
   }
@@ -213,14 +213,14 @@ export default function FinancePage() {
       ['Ngày', 'Booking ID', 'Phòng', 'Khách', 'Danh mục', 'Mô tả', 'Số tiền', 'Phương thức', 'Phụ thu thẻ', 'Trạng thái'],
       revenueItems.map((item) => [
         item.date,
-        item.booking_id || '',
-        item.room_id || '',
-        item.guest_name || '',
+        item.bookingId || '',
+        item.roomId || '',
+        item.guestName || '',
         getRevenueLabel(item.category),
         item.description,
         item.amount,
-        item.payment_method,
-        item.card_surcharge,
+        item.paymentMethod,
+        item.cardSurcharge,
         item.status,
       ]),
     )
@@ -241,11 +241,11 @@ export default function FinancePage() {
       ['Ngày', 'Khách', 'Phòng', 'Danh mục', 'Số tiền', 'Booking ID'],
       unpaid.map((item) => [
         item.date,
-        item.guest_name || '',
-        item.room_id || '',
+        item.guestName || '',
+        item.roomId || '',
         getRevenueLabel(item.category),
         revenueTotal(item),
-        item.booking_id || '',
+        item.bookingId || '',
       ]),
     )
   }
@@ -396,7 +396,7 @@ export default function FinancePage() {
                 <input value={revenueForm.description} onChange={(event) => setRevenueForm((c) => ({ ...c, description: event.target.value }))} placeholder="Mô tả" className="rounded-lg border border-slate-200 px-2 py-2 text-sm md:col-span-2" />
                 <input type="number" min={0} value={revenueForm.amount} onChange={(event) => setRevenueForm((c) => ({ ...c, amount: Math.max(0, Number(event.target.value) || 0) }))} placeholder="Số tiền" className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
                 <div className="flex gap-2">
-                  <select value={revenueForm.payment_method} onChange={(event) => setRevenueForm((c) => ({ ...c, payment_method: event.target.value as 'cash' | 'card' }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                  <select value={revenueForm.paymentMethod} onChange={(event) => setRevenueForm((c) => ({ ...c, paymentMethod: event.target.value as 'cash' | 'card' }))} className="rounded-lg border border-slate-200 px-2 py-2 text-sm">
                     <option value="cash">Cash</option>
                     <option value="card">Card</option>
                   </select>
@@ -428,7 +428,7 @@ export default function FinancePage() {
                     {revenueItems.map((item) => (
                       <tr key={item.id} className="border-t border-slate-100">
                         <td className="px-3 py-2">{format(parseISO(item.date), 'dd/MM/yyyy')}</td>
-                        <td className="px-3 py-2 text-slate-600">{item.booking_id || '-'}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.bookingId || '-'}</td>
                         <td className="px-3 py-2">{getRevenueLabel(item.category)}</td>
                         <td className="px-3 py-2 text-slate-600">{item.description}</td>
                         <td className="px-3 py-2 font-semibold text-slate-900">{formatMoney(revenueTotal(item))}</td>
@@ -461,7 +461,7 @@ export default function FinancePage() {
                 <input value={expenseForm.description} onChange={(event) => setExpenseForm((c) => ({ ...c, description: event.target.value }))} placeholder="Mô tả" className="rounded-lg border border-slate-200 px-2 py-2 text-sm md:col-span-2" />
                 <input type="number" min={0} value={expenseForm.amount} onChange={(event) => setExpenseForm((c) => ({ ...c, amount: Math.max(0, Number(event.target.value) || 0) }))} placeholder="Số tiền" className="rounded-lg border border-slate-200 px-2 py-2 text-sm" />
                 <div className="flex gap-2">
-                  <input value={expenseForm.paid_by} onChange={(event) => setExpenseForm((c) => ({ ...c, paid_by: event.target.value }))} placeholder="Người chi" className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                  <input value={expenseForm.paidBy} onChange={(event) => setExpenseForm((c) => ({ ...c, paidBy: event.target.value }))} placeholder="Người chi" className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
                   <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" /> Thêm</button>
                 </div>
               </form>
@@ -560,11 +560,11 @@ export default function FinancePage() {
                     {revenueItems.filter((item) => item.status === 'unpaid').map((item) => (
                       <tr key={item.id} className="border-t border-slate-100">
                         <td className="px-3 py-2">{format(parseISO(item.date), 'dd/MM/yyyy')}</td>
-                        <td className="px-3 py-2">{item.guest_name || '-'}</td>
-                        <td className="px-3 py-2">{item.room_id || '-'}</td>
+                        <td className="px-3 py-2">{item.guestName || '-'}</td>
+                        <td className="px-3 py-2">{item.roomId || '-'}</td>
                         <td className="px-3 py-2">{getRevenueLabel(item.category)}</td>
                         <td className="px-3 py-2 font-semibold text-red-600">{formatMoney(revenueTotal(item))}</td>
-                        <td className="px-3 py-2 text-slate-600">{item.booking_id || '-'}</td>
+                        <td className="px-3 py-2 text-slate-600">{item.bookingId || '-'}</td>
                         <td className="px-3 py-2">
                           <div className="flex gap-2">
                             <button type="button" onClick={() => void markRevenuePaid(item.id, 'cash')} className="rounded border border-slate-200 px-2 py-1 text-xs">Cash</button>

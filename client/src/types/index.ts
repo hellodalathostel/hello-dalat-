@@ -44,16 +44,14 @@ export interface Group {
 
 export interface GroupBooking {
   id: string
-  group_name: string
-  created_at: string
-  createdAt?: string
+  groupName: string
+  createdAt: string
   status: 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
   note?: string
 }
 
 export interface Booking {
   id: string
-  group_booking_id?: string | null
   groupBookingId?: string | null
   roomId: string
   guestName: string
@@ -150,19 +148,19 @@ export type RevenueCategory = 'room' | 'breakfast' | 'scooter' | 'tour' | 'other
 
 export interface RevenueItem {
   id: string
-  booking_id: string | null
-  group_booking_id: string | null
+  bookingId: string | null
+  groupBookingId: string | null
   date: string
   category: RevenueCategory
   description: string
   amount: number
-  payment_method: 'cash' | 'card'
-  card_surcharge: number
+  paymentMethod: 'cash' | 'card'
+  cardSurcharge: number
   status: 'paid' | 'unpaid'
-  room_id?: string | null
-  guest_name?: string
-  created_at: string
-  updated_at: string
+  roomId?: string | null
+  guestName?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type ExpenseCategoryV2 =
@@ -180,8 +178,8 @@ export interface ExpenseItem {
   category: ExpenseCategoryV2
   description: string
   amount: number
-  paid_by?: string
+  paidBy?: string
   note?: string
-  created_at: string
-  updated_at: string
+  createdAt: string
+  updatedAt: string
 }
