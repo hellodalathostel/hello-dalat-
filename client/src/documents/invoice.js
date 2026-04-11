@@ -105,7 +105,7 @@ export function buildInvoiceHtml(reservation, invoice) {
     ? invoice.lineItems
     : null
 
-  const line_items = invoiceStoredItems
+  const lineItems = invoiceStoredItems
     ? invoiceStoredItems
         .map((item, idx) => ({
           type: Number(item.total ?? 0) < 0 ? 'discount' : 'item',
@@ -119,16 +119,21 @@ export function buildInvoiceHtml(reservation, invoice) {
         }))
         .filter((item) => item.total !== 0)
     : buildLineItems(reservation)
-  const { subtotal, card_fee, total_with_fee, amount_due } = calcTotals(line_items, paymentMethod, depositPaid)
+  const {
+    subtotal,
+    card_fee: cardFee,
+    total_with_fee: totalWithFee,
+    amount_due: amountDue,
+  } = calcTotals(lineItems, paymentMethod, depositPaid)
   const transferNote = `HOADON ${invoiceNumber} ${guestName}`
   const issueDate = invoice.issueDate || invoice.issue_date || ''
   const roomNumber = getRoomNumber(reservation)
-  const roomLabel = reservation.room_type || reservation.reservation?.room_type || getRoomType(roomNumber)
+  const roomLabel = reservation.roomType || reservation.reservation?.roomType || reservation.room_type || reservation.reservation?.room_type || getRoomType(roomNumber)
   const roomDisplay = `${roomNumber} – ${roomLabel}`
   const guestCount = getGuestCount(reservation)
   const source = getSource(reservation)
 
-  const tableRows = line_items
+  const tableRows = lineItems
     .map(
       (item, index) => `
         <tr class="${item.type === 'discount' ? 'discount-row' : ''}">
@@ -181,10 +186,10 @@ export function buildInvoiceHtml(reservation, invoice) {
 
     <div class="summary">
       ${renderSummaryRow('Subtotal', 'Tạm tính', subtotal)}
-      ${paymentMethod === 'card' ? renderSummaryRow('Card Fee 4%', 'Phí quẹt thẻ 4%', card_fee) : ''}
-      ${renderSummaryRow('Total', 'Tổng cộng', total_with_fee, 'total')}
+      ${paymentMethod === 'card' ? renderSummaryRow('Card Fee 4%', 'Phí quẹt thẻ 4%', cardFee) : ''}
+      ${renderSummaryRow('Total', 'Tổng cộng', totalWithFee, 'total')}
       ${renderSummaryRow('Deposit (-)', 'Đã đặt cọc (-)', depositPaid)}
-      ${renderSummaryRow('AMOUNT DUE', 'SỐ TIỀN THANH TOÁN', amount_due, 'due')}
+      ${renderSummaryRow('AMOUNT DUE', 'SỐ TIỀN THANH TOÁN', amountDue, 'due')}
     </div>
 
     <div class="box bank">
@@ -193,11 +198,11 @@ export function buildInvoiceHtml(reservation, invoice) {
         ${renderInfoItem('Bank', 'Ngân hàng', hostelConfig.bank_name)}
         ${renderInfoItem('Account Number', 'Số tài khoản', hostelConfig.bank_account)}
         ${renderInfoItem('Account Holder', 'Chủ tài khoản', hostelConfig.bank_owner)}
-        ${renderInfoItem('Amount', 'Số tiền', `${formatVND(amount_due)} VND`)}
+        ${renderInfoItem('Amount', 'Số tiền', `${formatVND(amountDue)} VND`)}
         ${renderInfoItem('Transfer Note', 'Nội dung CK', transferNote)}
       </div>
       <div style="width: 232px; flex: 0 0 232px; text-align: right;">
-        <img src="${buildVietQrUrl(amount_due, transferNote)}" alt="QR" style="width: 220px; height: 220px; object-fit: contain;">
+        <img src="${buildVietQrUrl(amountDue, transferNote)}" alt="QR" style="width: 220px; height: 220px; object-fit: contain;">
       </div>
     </div>
 

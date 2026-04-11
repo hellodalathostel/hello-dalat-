@@ -52,7 +52,7 @@ export function getBookingCode(reservation) {
 }
 
 export function getGuestName(reservation) {
-  return reservation.guest_name || reservation.guestName || reservation.name || 'Guest'
+  return reservation.guestName || reservation.guest_name || reservation.name || 'Guest'
 }
 
 export function getGuestCount(reservation) {
@@ -63,12 +63,12 @@ export function getGuestCount(reservation) {
 }
 
 export function getRoomNumber(reservation) {
-  return reservation.room_number || reservation.roomId || reservation.room_id || '-'
+  return reservation.roomId || reservation.room_number || reservation.room_id || '-'
 }
 
 export function getRoomType(reservation) {
   if (reservation && typeof reservation === 'object') {
-    const explicitRoomType = reservation.reservation?.room_type || reservation.room_type || reservation.roomType
+    const explicitRoomType = reservation.roomType || reservation.reservation?.roomType || reservation.room_type || reservation.reservation?.room_type
     if (explicitRoomType) {
       return explicitRoomType
     }

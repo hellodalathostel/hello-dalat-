@@ -64,19 +64,19 @@ export function buildBookingConfirmationHtml(reservation) {
   //   "depositPaid": 200000
   // }
   const bookingCode = getBookingCode(reservation)
-  const line_items = buildLineItems(reservation)
+  const lineItems = buildLineItems(reservation)
   const paymentMethod = getPaymentMethod(reservation)
   const depositPaid = getDepositPaid(reservation)
-  const { subtotal } = calcTotals(line_items, paymentMethod, depositPaid)
+  const { subtotal } = calcTotals(lineItems, paymentMethod, depositPaid)
   const balanceDue = subtotal - depositPaid
   const guestName = getGuestName(reservation)
   const guestCount = getGuestCount(reservation)
   const source = getSource(reservation)
   const roomNumber = getRoomNumber(reservation)
-  const roomLabel = reservation.room_type || reservation.reservation?.room_type || getRoomType(roomNumber)
+  const roomLabel = reservation.roomType || reservation.reservation?.roomType || reservation.room_type || reservation.reservation?.room_type || getRoomType(roomNumber)
   const roomDisplay = `${roomNumber} – ${roomLabel}`
 
-  const tableRows = line_items
+  const tableRows = lineItems
     .map(
       (item) => `
         <tr class="${item.type === 'discount' ? 'discount-row' : ''}">
