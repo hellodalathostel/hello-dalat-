@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import { useOverviewData } from '../hooks/useOverviewData'
 import type { Booking } from '../types'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 const brandColor = '#2D5016'
 const pieColors = ['#2D5016', '#557f33', '#7aa453', '#a8c77f', '#d8e6c8']

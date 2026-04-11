@@ -4,7 +4,7 @@ import { ArrowLeft, FileSpreadsheet } from 'lucide-react'
 import { useGroupBookings } from '../hooks/useGroupBookings'
 import { openGroupBill } from '../documents/groupBill'
 import type { Booking, GroupBooking } from '../types'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 function toStatusLabel(status: GroupBooking['status']) {
   switch (status) {

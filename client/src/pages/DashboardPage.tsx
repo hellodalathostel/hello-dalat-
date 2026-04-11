@@ -7,7 +7,7 @@ import SyncStatusWidget from '../components/dashboard/SyncStatusWidget'
 import { useBookings } from '../hooks/useBookings'
 import { useFinance } from '../hooks/useFinance'
 import type { Booking } from '../types'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 function getInitialWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 })

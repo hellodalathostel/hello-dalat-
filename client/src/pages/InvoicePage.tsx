@@ -16,7 +16,7 @@ import { useInvoices } from '../hooks/useInvoices'
 import type { Booking, Invoice } from '../types'
 import { openInvoice } from '../documents/invoice'
 import { buildLineItems } from '../utils/buildLineItems.js'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 interface InvoiceLineItemForm {
   description: string

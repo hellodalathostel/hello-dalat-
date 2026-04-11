@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useFinanceModule } from '../hooks/useFinanceModule'
 import { downloadCsv } from '../utils/exportCsv'
 import type { ExpenseCategoryV2, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 type FinanceTab = 'revenue' | 'expense' | 'debt' | 'profit'
 

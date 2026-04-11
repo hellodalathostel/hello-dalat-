@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db } from '../../firebase'
 import { ensureRevenueItemsForBooking } from '../../services/revenueSync'
 import type { Booking, ServiceItem } from '../../types'
-import { formatMoney } from '../../utils/formatVND.js'
+import { formatMoney } from '../../utils/formatMoney'
 
 const roomOptions = [
   { value: '101', label: '101 - Family' },

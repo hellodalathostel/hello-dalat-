@@ -2,7 +2,7 @@ import { format } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import type { Booking, Invoice } from '../../types'
 import { buildLineItems } from '../../utils/buildLineItems.js'
-import { formatMoney } from '../../utils/formatVND.js'
+import { formatMoney } from '../../utils/formatMoney'
 
 export interface InvoiceLineItemForm {
   description: string

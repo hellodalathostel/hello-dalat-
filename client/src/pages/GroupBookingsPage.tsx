@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { useGroupBookings } from '../hooks/useGroupBookings'
 import type { Booking } from '../types'
-import { formatMoney } from '../utils/formatVND.js'
+import { formatMoney } from '../utils/formatMoney'
 
 const BREAKFAST_PRICE = 35000
 
