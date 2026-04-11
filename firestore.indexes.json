@@ -43,29 +43,29 @@
       ]
     },
     {
-      "collectionGroup": "finance",
+      "collectionGroup": "bookings",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "type",
+          "fieldPath": "checkOut",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "date",
-          "order": "DESCENDING"
+          "fieldPath": "checkIn",
+          "order": "ASCENDING"
         }
       ]
     },
     {
-      "collectionGroup": "finance",
+      "collectionGroup": "bookings",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "category",
+          "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "date",
+          "fieldPath": "checkOut",
           "order": "DESCENDING"
         }
       ]
@@ -88,11 +88,50 @@
       "collectionGroup": "bookings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "roomId", "order": "ASCENDING" },
-        { "fieldPath": "checkOut", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "checkIn", "order": "ASCENDING" },
-        { "fieldPath": "checkOut", "order": "ASCENDING" }
+        {
+          "fieldPath": "roomId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "checkOut",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "icalEventId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "roomId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "roomId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "source",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],

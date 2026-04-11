@@ -1,6 +1,6 @@
 import { formatVND } from './formatVND'
 
-const BREAKFAST_PRICE = 50000
+const BREAKFAST_PRICE = 35000
 const EXTRA_FEE_DEFAULT = 100000
 
 function toNumber(value) {

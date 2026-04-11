@@ -2,7 +2,7 @@ import { hostelConfig } from '../constants/hostelConfig'
 import { formatVND } from '../utils/formatVND'
 
 export const OTA_SOURCES = new Set(['booking.com', 'agoda', 'airbnb', 'expedia'])
-export const BREAKFAST_PRICE = 50000
+export const BREAKFAST_PRICE = 35000
 export const EXTRA_CHECK_FEE = 100000
 const ROOM_TYPE_BY_ROOM_NUMBER = {
   '101': 'Family Room',

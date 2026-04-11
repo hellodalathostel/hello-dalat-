@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Timestamp,
   addDoc,
   collection,
   deleteDoc,
@@ -32,7 +33,7 @@ function getYear(date = new Date()): number {
 }
 
 function parseInvoiceCounter(invoiceNumber: string): number {
-  const match = invoiceNumber.match(/^HD\d{4}-(\d+)$/)
+  const match = invoiceNumber.match(/(\d+)(?!.*\d)/)
   if (!match) {
     return 0
   }
@@ -49,9 +50,16 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
     setError(null)
 
     try {
+      const [yearPart, monthPart] = month.split('-').map(Number)
+      const safeYear = Number.isFinite(yearPart) ? yearPart : new Date().getFullYear()
+      const safeMonth = Number.isFinite(monthPart) ? monthPart : new Date().getMonth() + 1
+      const lastDay = new Date(safeYear, safeMonth, 0).getDate()
+      const startDate = `${month}-01`
+      const endDate = `${month}-${String(lastDay).padStart(2, '0')}`
+
       const constraints = [
-        where('issueDate', '>=', `${month}-01`),
-        where('issueDate', '<=', `${month}-31`),
+        where('issueDate', '>=', startDate),
+        where('issueDate', '<=', endDate),
         orderBy('issueDate', 'desc'),
       ] as const
 
@@ -121,7 +129,7 @@ export function useInvoices(month: string, statusFilter: 'all' | 'paid' | 'pendi
       id: created.id,
       ...data,
       invoiceNumber,
-      createdAt: serverTimestamp() as never,
+      createdAt: Timestamp.now(),
     }
   }, [fetchInvoices, getNextInvoiceNumber])
 

@@ -65,6 +65,8 @@ function withCardSurcharge(amount: number, paymentMethod: 'cash' | 'card') {
 type FinanceModuleState = {
   revenueItems: RevenueItem[]
   expenses: ExpenseItem[]
+  revenueLoaded: boolean
+  expenseLoaded: boolean
   loading: boolean
   error: string | null
 }
@@ -79,15 +81,43 @@ type FinanceModuleAction =
 function financeModuleReducer(state: FinanceModuleState, action: FinanceModuleAction): FinanceModuleState {
   switch (action.type) {
     case 'LOADING':
-      return { ...state, loading: true, error: null }
+      return {
+        ...state,
+        loading: true,
+        revenueLoaded: false,
+        expenseLoaded: false,
+        error: null,
+      }
     case 'REVENUE_SUCCESS':
-      return { ...state, revenueItems: action.items }
+      return {
+        ...state,
+        revenueItems: action.items,
+        revenueLoaded: true,
+        loading: !state.expenseLoaded,
+      }
     case 'EXPENSE_SUCCESS':
-      return { ...state, expenses: action.items, loading: false }
+      return {
+        ...state,
+        expenses: action.items,
+        expenseLoaded: true,
+        loading: !state.revenueLoaded,
+      }
     case 'REVENUE_ERROR':
-      return { ...state, revenueItems: [], error: action.error }
+      return {
+        ...state,
+        revenueItems: [],
+        revenueLoaded: true,
+        loading: !state.expenseLoaded,
+        error: action.error,
+      }
     case 'EXPENSE_ERROR':
-      return { ...state, expenses: [], loading: false, error: action.error }
+      return {
+        ...state,
+        expenses: [],
+        expenseLoaded: true,
+        loading: !state.revenueLoaded,
+        error: action.error,
+      }
     default:
       return state
   }
@@ -97,6 +127,8 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
   const [state, dispatch] = useReducer(financeModuleReducer, {
     revenueItems: [],
     expenses: [],
+    revenueLoaded: false,
+    expenseLoaded: false,
     loading: true,
     error: null,
   })

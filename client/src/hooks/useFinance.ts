@@ -52,10 +52,17 @@ export function useFinance(month: string): UseFinanceResult {
   useEffect(() => {
     dispatch({ type: 'LOADING' })
 
+    const [yearPart, monthPart] = month.split('-').map(Number)
+    const safeYear = Number.isFinite(yearPart) ? yearPart : new Date().getFullYear()
+    const safeMonth = Number.isFinite(monthPart) ? monthPart : new Date().getMonth() + 1
+    const lastDay = new Date(safeYear, safeMonth, 0).getDate()
+    const startDate = `${month}-01`
+    const endDate = `${month}-${String(lastDay).padStart(2, '0')}`
+
     const financeQuery = query(
       collection(db, 'financeEntries'),
-      where('date', '>=', `${month}-01`),
-      where('date', '<=', `${month}-31`),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
       orderBy('date', 'desc'),
     )
 

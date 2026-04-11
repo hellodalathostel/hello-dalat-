@@ -88,6 +88,7 @@ export default function InvoicePage() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [bookingsLoading, setBookingsLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [draft, setDraft] = useState<InvoiceDraft>(makeDefaultDraft)
 
   const {
@@ -147,12 +148,14 @@ export default function InvoicePage() {
 
   function openCreate() {
     setEditingInvoice(null)
+    setFormError(null)
     setDraft(makeDefaultDraft())
     setShowModal(true)
   }
 
   function openEdit(invoice: Invoice) {
     setEditingInvoice(invoice)
+    setFormError(null)
     setDraft(computeTotals({
       bookingId: invoice.bookingId,
       guestName: invoice.guestName,
@@ -219,9 +222,11 @@ export default function InvoicePage() {
   }
 
   async function handleSave(openAfterSave: boolean) {
+    setFormError(null)
     const booking = bookingById.get(draft.bookingId)
 
     if (!booking || !draft.guestName.trim() || draft.lineItems.length === 0) {
+      setFormError('Vui long chon booking va dien day du thong tin hoa don.')
       return
     }
 
@@ -243,22 +248,27 @@ export default function InvoicePage() {
 
     let invoiceForDocument: Invoice | null = null
 
-    if (editingInvoice) {
-      await updateInvoice(editingInvoice.id, payload)
-      invoiceForDocument = {
-        ...editingInvoice,
-        ...payload,
+    try {
+      if (editingInvoice) {
+        await updateInvoice(editingInvoice.id, payload)
+        invoiceForDocument = {
+          ...editingInvoice,
+          ...payload,
+        }
+      } else {
+        const created = await createInvoice(payload)
+        invoiceForDocument = created
       }
-    } else {
-      const created = await createInvoice(payload)
-      invoiceForDocument = created
-    }
 
-    if (openAfterSave && invoiceForDocument) {
-      openInvoice(booking, invoiceForDocument)
-    }
+      if (openAfterSave && invoiceForDocument) {
+        openInvoice(booking, invoiceForDocument)
+      }
 
-    setShowModal(false)
+      setShowModal(false)
+    } catch (saveError) {
+      console.error(saveError)
+      setFormError('Khong the luu hoa don. Vui long thu lai.')
+    }
   }
 
   return (
@@ -366,7 +376,10 @@ export default function InvoicePage() {
                             <button
                               type="button"
                               onClick={() => {
-                                void deleteInvoice(invoice.id)
+                                void deleteInvoice(invoice.id).catch((deleteError) => {
+                                  console.error(deleteError)
+                                  setFormError('Khong the xoa hoa don. Vui long thu lai.')
+                                })
                               }}
                               className="rounded-lg border border-red-200 px-2 py-1 text-red-600 hover:bg-red-50"
                               title="Xoa"
@@ -391,6 +404,8 @@ export default function InvoicePage() {
             <h2 className="text-lg font-semibold text-slate-900">
               {editingInvoice ? 'Sua hoa don' : 'Tao hoa don'}
             </h2>
+
+            {formError ? <p className="mt-3 text-sm text-red-600">{formError}</p> : null}
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
               <label className="space-y-1 text-sm text-slate-600 md:col-span-2">

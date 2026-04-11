@@ -423,11 +423,16 @@ export default function BookingForm({
         await updateDoc(doc(db, 'bookings', booking.id), payload)
 
         if (payload.status === 'checkedout' || payload.paymentStatus === 'paid') {
-          await ensureRevenueItemsForBooking({
-            ...booking,
-            ...payload,
-            id: booking.id,
-          })
+          try {
+            await ensureRevenueItemsForBooking({
+              ...booking,
+              ...payload,
+              id: booking.id,
+            })
+          } catch (syncError) {
+            console.error(syncError)
+            setError('Booking da luu, nhung khong the dong bo doanh thu tu dong.')
+          }
         }
       } else {
         const created = await addDoc(collection(db, 'bookings'), {
@@ -436,11 +441,16 @@ export default function BookingForm({
         })
 
         if (payload.status === 'checkedout' || payload.paymentStatus === 'paid') {
-          await ensureRevenueItemsForBooking({
-            ...(payload as Omit<Booking, 'id' | 'createdAt'>),
-            id: created.id,
-            createdAt: now,
-          } as Booking)
+          try {
+            await ensureRevenueItemsForBooking({
+              ...(payload as Omit<Booking, 'id' | 'createdAt'>),
+              id: created.id,
+              createdAt: now,
+            } as Booking)
+          } catch (syncError) {
+            console.error(syncError)
+            setError('Booking da luu, nhung khong the dong bo doanh thu tu dong.')
+          }
         }
       }
 

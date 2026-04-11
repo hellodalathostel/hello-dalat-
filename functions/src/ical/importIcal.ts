@@ -144,8 +144,15 @@ async function runBookingComSync() {
           continue
         }
 
-        const checkIn = dtStart.toString().slice(0, 10)
-        const checkOut = dtEnd.toString().slice(0, 10)
+        const dtStartText = dtStart.toString()
+        const dtEndText = dtEnd.toString()
+        if (dtStartText.length < 10 || dtEndText.length < 10) {
+          logger.warn('Skipping invalid event date', { roomId, uid })
+          continue
+        }
+
+        const checkIn = dtStartText.slice(0, 10)
+        const checkOut = dtEndText.slice(0, 10)
 
         activeUids.add(uid)
 
