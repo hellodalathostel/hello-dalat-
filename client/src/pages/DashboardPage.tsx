@@ -7,6 +7,7 @@ import SyncStatusWidget from '../components/dashboard/SyncStatusWidget'
 import { useBookings } from '../hooks/useBookings'
 import { useFinance } from '../hooks/useFinance'
 import type { Booking } from '../types'
+import { formatMoney } from '../utils/formatVND.js'
 
 function getInitialWeekStart() {
   return startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -26,8 +27,6 @@ export default function DashboardPage() {
   const currentMonth = format(new Date(), 'yyyy-MM')
   const { bookings, loading, error, refetch } = useBookings(startDate, endDate)
   const { totalIncome, totalExpense, netProfit } = useFinance(currentMonth)
-
-  const formatMoney = (value: number) => `${value.toLocaleString('vi-VN')} đ`
 
   return (
     <main className="min-h-screen bg-[#f6f3e8] px-4 py-6 md:px-8 md:py-8">

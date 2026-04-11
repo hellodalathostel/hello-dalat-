@@ -16,6 +16,7 @@ import { useInvoices } from '../hooks/useInvoices'
 import type { Booking, Invoice } from '../types'
 import { openInvoice } from '../documents/invoice'
 import { buildLineItems } from '../utils/buildLineItems.js'
+import { formatMoney } from '../utils/formatVND.js'
 
 interface InvoiceLineItemForm {
   description: string
@@ -38,10 +39,6 @@ interface InvoiceDraft {
   cardFeeAmount: number
   status: Invoice['status']
   notes: string
-}
-
-function toVnd(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`
 }
 
 function toLineItem(description: string, quantity: number, unitPrice: number): InvoiceLineItemForm {
@@ -345,7 +342,7 @@ export default function InvoicePage() {
                         <td className="px-3 py-2">{invoice.guestName}</td>
                         <td className="px-3 py-2">{booking?.roomId || '-'}</td>
                         <td className="px-3 py-2">{format(parseISO(invoice.issueDate), 'dd/MM/yyyy')}</td>
-                        <td className="px-3 py-2">{toVnd(invoice.total)}</td>
+                        <td className="px-3 py-2">{formatMoney(invoice.total)}</td>
                         <td className="px-3 py-2">
                           <span className={`rounded-full px-2 py-1 text-xs font-semibold ${invoice.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                             {invoice.status === 'paid' ? 'Da TT' : 'Cho TT'}
@@ -559,10 +556,10 @@ export default function InvoicePage() {
             </div>
 
             <div className="mt-4 rounded-xl bg-[#faf8f1] p-3 text-sm text-slate-700">
-              <p>Tam tinh: {toVnd(draft.subtotal)}</p>
-              <p>Giam gia: -{toVnd(draft.discount)}</p>
-              <p>Phi the: +{toVnd(draft.cardFeeAmount)}</p>
-              <p className="mt-1 font-semibold text-primary">Tong cong: {toVnd(draft.total)}</p>
+              <p>Tam tinh: {formatMoney(draft.subtotal)}</p>
+              <p>Giam gia: -{formatMoney(draft.discount)}</p>
+              <p>Phi the: +{formatMoney(draft.cardFeeAmount)}</p>
+              <p className="mt-1 font-semibold text-primary">Tong cong: {formatMoney(draft.total)}</p>
             </div>
 
             <label className="mt-4 block space-y-1 text-sm text-slate-600">

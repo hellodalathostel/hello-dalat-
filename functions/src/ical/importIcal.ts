@@ -41,6 +41,8 @@ interface SyncSummary {
   status: 'success' | 'partial' | 'error'
 }
 
+const MAX_BATCH_OPERATIONS = 400
+
 function calculateNights(checkIn: string, checkOut: string): number {
   const inDate = new Date(`${checkIn}T00:00:00Z`)
   const outDate = new Date(`${checkOut}T00:00:00Z`)
@@ -101,6 +103,23 @@ function buildSyncSummary(results: RoomSyncResult[]): SyncSummary {
   }
 }
 
+async function commitBatchIfNeeded(
+  db: FirebaseFirestore.Firestore,
+  batch: FirebaseFirestore.WriteBatch,
+  operationCount: number,
+) {
+  if (operationCount < MAX_BATCH_OPERATIONS) {
+    return { batch, operationCount }
+  }
+
+  await batch.commit()
+
+  return {
+    batch: db.batch(),
+    operationCount: 0,
+  }
+}
+
 async function runBookingComSync() {
   const db = getFirestore()
   const rawConfig = process.env.BOOKING_ICAL_URLS || '{}'
@@ -124,6 +143,8 @@ async function runBookingComSync() {
       const vevents = component.getAllSubcomponents('vevent') as unknown as VeventLike[]
       const activeUids = new Set<string>()
       const now = new Date().toISOString()
+      let batch = db.batch()
+      let batchOperationCount = 0
 
       for (const vevent of vevents) {
         const uidRaw = vevent.getFirstPropertyValue('uid')
@@ -166,7 +187,9 @@ async function runBookingComSync() {
         if (existingSnapshot.empty) {
           const nights = calculateNights(checkIn, checkOut)
 
-          await db.collection('bookings').add({
+          const bookingRef = db.collection('bookings').doc()
+
+          batch.set(bookingRef, {
             roomId,
             source: 'booking.com',
             guestName,
@@ -193,6 +216,8 @@ async function runBookingComSync() {
             createdAt: now,
             updatedAt: now,
           })
+          batchOperationCount += 1
+          ;({ batch, operationCount: batchOperationCount } = await commitBatchIfNeeded(db, batch, batchOperationCount))
           createdCount += 1
           logger.info(`Created booking for room ${roomId}: ${uid}`)
           continue
@@ -205,11 +230,13 @@ async function runBookingComSync() {
         }
 
         if (existingData.checkIn !== checkIn || existingData.checkOut !== checkOut) {
-          await existingDoc.ref.update({
+          batch.update(existingDoc.ref, {
             checkIn,
             checkOut,
             updatedAt: now,
           })
+          batchOperationCount += 1
+          ;({ batch, operationCount: batchOperationCount } = await commitBatchIfNeeded(db, batch, batchOperationCount))
           updatedCount += 1
           logger.info(`Updated booking ${existingDoc.id} for room ${roomId}`)
         }
@@ -230,12 +257,18 @@ async function runBookingComSync() {
           continue
         }
 
-        await docSnapshot.ref.update({
+        batch.update(docSnapshot.ref, {
           status: 'cancelled',
           updatedAt: now,
         })
+        batchOperationCount += 1
+        ;({ batch, operationCount: batchOperationCount } = await commitBatchIfNeeded(db, batch, batchOperationCount))
         cancelledCount += 1
         logger.info(`Cancelled removed booking ${docSnapshot.id}`)
+      }
+
+      if (batchOperationCount > 0) {
+        await batch.commit()
       }
 
       logger.info('Room sync completed', {

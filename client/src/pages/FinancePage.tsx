@@ -6,12 +6,9 @@ import { useSearchParams } from 'react-router-dom'
 import { useFinanceModule } from '../hooks/useFinanceModule'
 import { downloadCsv } from '../utils/exportCsv'
 import type { ExpenseCategoryV2, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
+import { formatMoney } from '../utils/formatVND.js'
 
 type FinanceTab = 'revenue' | 'expense' | 'debt' | 'profit'
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString('vi-VN')} đ`
-}
 
 function parseMonth(month: string) {
   return parse(`${month}-01`, 'yyyy-MM-dd', new Date())
@@ -91,6 +88,7 @@ export default function FinancePage() {
     updateExpense,
     deleteExpense,
     markRevenuePaid,
+    refetch,
   } = useFinanceModule({ from: fromDate, to: toDate })
 
   const [revenueForm, setRevenueForm] = useState<RevenueForm>({
@@ -286,6 +284,13 @@ export default function FinancePage() {
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-primary/60">Finance</p>
               <h1 className="mt-2 text-3xl font-semibold text-slate-900">Tài chính</h1>
             </div>
+            <button
+              type="button"
+              onClick={refetch}
+              className="rounded-xl border border-primary/15 bg-white px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/5"
+            >
+              Làm mới
+            </button>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">

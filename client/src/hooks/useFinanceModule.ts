@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import {
   addDoc,
   collection,
   deleteDoc,
   doc,
-  onSnapshot,
+  getDocs,
   orderBy,
   query,
   updateDoc,
@@ -63,6 +63,7 @@ interface UseFinanceModuleResult {
   updateExpense: (id: string, input: Partial<CreateExpenseInput>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   markRevenuePaid: (id: string, method: 'cash' | 'card') => Promise<void>
+  refetch: () => void
 }
 
 function withCardSurcharge(amount: number, paymentMethod: 'cash' | 'card') {
@@ -140,8 +141,10 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
     loading: true,
     error: null,
   })
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
     dispatch({ type: 'LOADING' })
 
     const revenueQuery = query(
@@ -158,41 +161,42 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       orderBy('date', 'desc'),
     )
 
-    const unsubscribeRevenue = onSnapshot(
-      revenueQuery,
-      (snapshot) => {
-        const items = snapshot.docs.map((d) => ({
-          ...mapRevenueItemFromDb(d.id, d.data() as DbRevenueItem),
-        }))
+    async function fetchData() {
+      try {
+        const [revenueSnapshot, expenseSnapshot] = await Promise.all([
+          getDocs(revenueQuery),
+          getDocs(expenseQuery),
+        ])
 
-        dispatch({ type: 'REVENUE_SUCCESS', items })
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
+        if (cancelled) {
+          return
+        }
+
+        dispatch({
+          type: 'REVENUE_SUCCESS',
+          items: revenueSnapshot.docs.map((d) => mapRevenueItemFromDb(d.id, d.data() as DbRevenueItem)),
+        })
+        dispatch({
+          type: 'EXPENSE_SUCCESS',
+          items: expenseSnapshot.docs.map((d) => mapExpenseItemFromDb(d.id, d.data() as DbExpenseItem)),
+        })
+      } catch (fetchError) {
+        if (cancelled) {
+          return
+        }
+
+        console.error(fetchError)
         dispatch({ type: 'REVENUE_ERROR', error: 'Không thể tải doanh thu.' })
-      },
-    )
-
-    const unsubscribeExpense = onSnapshot(
-      expenseQuery,
-      (snapshot) => {
-        const items = snapshot.docs.map((d) => ({
-          ...mapExpenseItemFromDb(d.id, d.data() as DbExpenseItem),
-        }))
-
-        dispatch({ type: 'EXPENSE_SUCCESS', items })
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
         dispatch({ type: 'EXPENSE_ERROR', error: 'Không thể tải chi phí.' })
-      },
-    )
+      }
+    }
+
+    void fetchData()
 
     return () => {
-      unsubscribeRevenue()
-      unsubscribeExpense()
+      cancelled = true
     }
-  }, [range.from, range.to])
+  }, [range.from, range.to, reloadTick])
 
   const totals = useMemo(() => {
     const totalRevenuePaid = state.revenueItems
@@ -237,6 +241,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       createdAt: now,
       updatedAt: now,
     }))
+    setReloadTick((t) => t + 1)
   }
 
   async function addExpense(input: CreateExpenseInput) {
@@ -252,6 +257,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       createdAt: now,
       updatedAt: now,
     }))
+    setReloadTick((t) => t + 1)
   }
 
   async function updateExpense(id: string, input: Partial<CreateExpenseInput>) {
@@ -264,10 +270,12 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       ...(input.note !== undefined ? { note: input.note.trim() } : {}),
       updated_at: new Date().toISOString(),
     })
+    setReloadTick((t) => t + 1)
   }
 
   async function deleteExpense(id: string) {
     await deleteDoc(doc(db, 'expenses', id))
+    setReloadTick((t) => t + 1)
   }
 
   async function markRevenuePaid(id: string, method: 'cash' | 'card') {
@@ -280,6 +288,7 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
       card_surcharge: withCardSurcharge(amount, method),
       updated_at: new Date().toISOString(),
     })
+    setReloadTick((t) => t + 1)
   }
 
   return {
@@ -297,5 +306,6 @@ export function useFinanceModule(range: FinanceRange): UseFinanceModuleResult {
     updateExpense,
     deleteExpense,
     markRevenuePaid,
+    refetch: () => setReloadTick((t) => t + 1),
   }
 }

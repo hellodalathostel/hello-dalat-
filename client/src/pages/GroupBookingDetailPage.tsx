@@ -4,10 +4,7 @@ import { ArrowLeft, FileSpreadsheet } from 'lucide-react'
 import { useGroupBookings } from '../hooks/useGroupBookings'
 import { openGroupBill } from '../documents/groupBill'
 import type { Booking, GroupBooking } from '../types'
-
-function toVnd(value: number) {
-  return `${value.toLocaleString('vi-VN')} đ`
-}
+import { formatMoney } from '../utils/formatVND.js'
 
 function toStatusLabel(status: GroupBooking['status']) {
   switch (status) {
@@ -171,8 +168,8 @@ export default function GroupBookingDetailPage() {
                         <td className="px-3 py-2 text-slate-700">{row.checkIn}</td>
                         <td className="px-3 py-2 text-slate-700">{row.checkOut}</td>
                         <td className="px-3 py-2 text-right text-slate-700">{row.nights}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{toVnd(row.roomRate)}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-slate-900">{toVnd(row.subtotal)}</td>
+                        <td className="px-3 py-2 text-right text-slate-700">{formatMoney(row.roomRate)}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-slate-900">{formatMoney(row.subtotal)}</td>
                         <td className="px-3 py-2 text-slate-700">{bookingStatusLabel(row.status)}</td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-2">
@@ -198,7 +195,7 @@ export default function GroupBookingDetailPage() {
                   <tfoot>
                     <tr className="border-t border-slate-300 bg-[#faf8f1]">
                       <td className="px-3 py-2 font-semibold text-slate-900" colSpan={5}>Tổng cộng</td>
-                      <td className="px-3 py-2 text-right text-base font-bold text-slate-900">{toVnd(grandTotal)}</td>
+                      <td className="px-3 py-2 text-right text-base font-bold text-slate-900">{formatMoney(grandTotal)}</td>
                       <td colSpan={2} />
                     </tr>
                   </tfoot>

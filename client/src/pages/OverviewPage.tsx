@@ -12,13 +12,10 @@ import {
 } from 'recharts'
 import { useOverviewData } from '../hooks/useOverviewData'
 import type { Booking } from '../types'
+import { formatMoney } from '../utils/formatVND.js'
 
 const brandColor = '#2D5016'
 const pieColors = ['#2D5016', '#557f33', '#7aa453', '#a8c77f', '#d8e6c8']
-
-function formatMoney(value: number) {
-  return `${value.toLocaleString('vi-VN')} đ`
-}
 
 function statusLabel(status: Booking['status']) {
   switch (status) {
@@ -75,6 +72,7 @@ export default function OverviewPage() {
     checkInsToday,
     checkOutsToday,
     today,
+    refetch,
   } = useOverviewData()
 
   return (
@@ -85,13 +83,21 @@ export default function OverviewPage() {
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.22em] text-primary/60">Overview Dashboard</p>
               <h1 className="mt-2 text-3xl font-semibold text-slate-900">Tổng quan vận hành</h1>
-              <p className="mt-2 text-sm text-slate-500">Dữ liệu realtime cho hôm nay và tháng hiện tại.</p>
+              <p className="mt-2 text-sm text-slate-500">Dữ liệu được tải theo yêu cầu cho hôm nay và tháng hiện tại.</p>
             </div>
+            <button
+              type="button"
+              onClick={refetch}
+              disabled={loading}
+              className="rounded-xl border border-primary/15 bg-white px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Đang làm mới...' : 'Làm mới dữ liệu'}
+            </button>
           </div>
 
           {metrics.unpaidTotal > 0 ? (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              ⚠️ Có {metrics.unpaidCount} khoản công nợ chưa thu — {formatMoney(metrics.unpaidTotal)}.{' '}
+              ⚠️ Có {metrics.unpaidCount} khoản công nợ tháng này chưa thu — {formatMoney(metrics.unpaidTotal)}.{' '}
               <Link to="/finance?tab=debt" className="font-semibold underline">
                 Xem công nợ
               </Link>
@@ -124,7 +130,7 @@ export default function OverviewPage() {
               </p>
             </article>
             <article className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Công nợ chưa thu</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Công nợ tháng này</p>
               <p className="mt-1 text-lg font-semibold text-amber-700">{formatMoney(metrics.unpaidTotal)}</p>
             </article>
           </div>

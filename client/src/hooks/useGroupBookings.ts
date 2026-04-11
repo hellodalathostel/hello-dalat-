@@ -1,3 +1,4 @@
+import { format, subDays } from 'date-fns'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   addDoc,
@@ -5,6 +6,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   orderBy,
   query,
   updateDoc,
@@ -85,11 +87,12 @@ export function useGroupBookings(): UseGroupBookingsResult {
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
+    const windowStart = format(subDays(new Date(), 30), 'yyyy-MM-dd')
 
     try {
       const [groupSnapshot, bookingSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'group_bookings'), orderBy('created_at', 'desc'))),
-        getDocs(query(collection(db, 'bookings'), orderBy('checkIn', 'asc'))),
+        getDocs(query(collection(db, 'group_bookings'), orderBy('created_at', 'desc'), limit(50))),
+        getDocs(query(collection(db, 'bookings'), where('checkOut', '>=', windowStart), orderBy('checkOut', 'asc'))),
       ])
 
       const nextGroups = groupSnapshot.docs.map((item) => ({

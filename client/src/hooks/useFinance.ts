@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import {
   collection,
-  onSnapshot,
+  getDocs,
   orderBy,
   query,
   where,
@@ -16,6 +16,7 @@ interface UseFinanceResult {
   totalIncome: number
   totalExpense: number
   netProfit: number
+  refetch: () => void
 }
 
 type FinanceState = {
@@ -48,8 +49,10 @@ export function useFinance(month: string): UseFinanceResult {
     loading: true,
     error: null,
   })
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
     dispatch({ type: 'LOADING' })
 
     const [yearPart, monthPart] = month.split('-').map(Number)
@@ -66,9 +69,14 @@ export function useFinance(month: string): UseFinanceResult {
       orderBy('date', 'desc'),
     )
 
-    const unsubscribe = onSnapshot(
-      financeQuery,
-      (snapshot) => {
+    async function fetchData() {
+      try {
+        const snapshot = await getDocs(financeQuery)
+
+        if (cancelled) {
+          return
+        }
+
         const nextEntries = snapshot.docs
           .map((document) => ({
             id: document.id,
@@ -77,15 +85,22 @@ export function useFinance(month: string): UseFinanceResult {
           .sort((left, right) => right.date.localeCompare(left.date))
 
         dispatch({ type: 'SUCCESS', entries: nextEntries })
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        dispatch({ type: 'ERROR', error: 'Không thể tải dữ liệu tài chính.' })
-      },
-    )
+      } catch (fetchError) {
+        if (cancelled) {
+          return
+        }
 
-    return unsubscribe
-  }, [month])
+        console.error(fetchError)
+        dispatch({ type: 'ERROR', error: 'Không thể tải dữ liệu tài chính.' })
+      }
+    }
+
+    void fetchData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [month, reloadTick])
 
   const { totalIncome, totalExpense } = useMemo(() => {
     let income = 0
@@ -110,5 +125,6 @@ export function useFinance(month: string): UseFinanceResult {
     totalIncome,
     totalExpense,
     netProfit: totalIncome - totalExpense,
+    refetch: () => setReloadTick((t) => t + 1),
   }
 }

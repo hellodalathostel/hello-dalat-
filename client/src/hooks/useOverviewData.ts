@@ -1,5 +1,5 @@
 import { eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth, subDays } from 'date-fns'
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { db } from '../firebase'
 import type { Booking, ExpenseItem, RevenueCategory, RevenueItem } from '../types'
@@ -45,6 +45,13 @@ interface UseOverviewDataResult {
   checkInsToday: Booking[]
   checkOutsToday: Booking[]
   today: string
+  refetch: () => void
+}
+
+interface OverviewDataState {
+  rangeBookings: Booking[]
+  monthRevenue: RevenueItem[]
+  monthExpenses: ExpenseItem[]
 }
 
 const TOTAL_ROOMS = 8
@@ -54,6 +61,11 @@ const revenueCategoryLabels: Record<RevenueCategory, string> = {
   scooter: 'Scooter',
   tour: 'Tour',
   other: 'Other',
+}
+const emptyOverviewDataState: OverviewDataState = {
+  rangeBookings: [],
+  monthRevenue: [],
+  monthExpenses: [],
 }
 
 function isActiveBooking(booking: Booking) {
@@ -92,174 +104,85 @@ function statusReducer(_state: OverviewStatus, action: OverviewStatusAction): Ov
 }
 
 export function useOverviewData(): UseOverviewDataResult {
-  // Compute date strings from current date - strings are stable within the same day
-  // and update naturally on the next render after midnight
   const todayDate = new Date()
   const today = format(todayDate, 'yyyy-MM-dd')
   const monthStart = format(startOfMonth(todayDate), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(todayDate), 'yyyy-MM-dd')
   const thirtyDaysStart = format(subDays(todayDate, 29), 'yyyy-MM-dd')
 
-  const [rangeBookings, setRangeBookings] = useState<Booking[]>([])
-  const [monthRevenue, setMonthRevenue] = useState<RevenueItem[]>([])
-  const [monthExpenses, setMonthExpenses] = useState<ExpenseItem[]>([])
-  const [unpaidRevenue, setUnpaidRevenue] = useState<RevenueItem[]>([])
-  const [checkInsToday, setCheckInsToday] = useState<Booking[]>([])
-  const [checkOutsToday, setCheckOutsToday] = useState<Booking[]>([])
+  const [overviewData, setOverviewData] = useState<OverviewDataState>(emptyOverviewDataState)
   const [{ loading, error }, dispatch] = useReducer(statusReducer, { loading: true, error: null })
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
-    dispatch({ type: 'INIT' })
+    let cancelled = false
 
-    const ready = {
-      range: false,
-      revenue: false,
-      expenses: false,
-      unpaid: false,
-      checkIn: false,
-      checkOut: false,
-    }
+    async function fetchOverviewData() {
+      dispatch({ type: 'INIT' })
 
-    const finishIfReady = () => {
-      if (Object.values(ready).every(Boolean)) {
+      try {
+        const [rangeBookingsSnapshot, monthRevenueSnapshot, monthExpensesSnapshot] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, 'bookings'),
+              where('checkIn', '<=', today),
+              where('checkOut', '>=', thirtyDaysStart),
+              orderBy('checkIn', 'asc'),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'revenue_items'),
+              where('date', '>=', monthStart),
+              where('date', '<=', monthEnd),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, 'expenses'),
+              where('date', '>=', monthStart),
+              where('date', '<=', monthEnd),
+            ),
+          ),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        setOverviewData({
+          rangeBookings: rangeBookingsSnapshot.docs.map((document) => mapBookingFromDb(document.id, document.data() as DbBooking)),
+          monthRevenue: monthRevenueSnapshot.docs.map((document) => mapRevenueItemFromDb(document.id, document.data() as DbRevenueItem)),
+          monthExpenses: monthExpensesSnapshot.docs.map((document) => mapExpenseItemFromDb(document.id, document.data() as DbExpenseItem)),
+        })
         dispatch({ type: 'READY' })
+      } catch (fetchError) {
+        if (cancelled) {
+          return
+        }
+
+        console.error(fetchError)
+        setOverviewData(emptyOverviewDataState)
+        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu tổng quan.' })
       }
     }
 
-    const unsubRangeBookings = onSnapshot(
-      query(
-        collection(db, 'bookings'),
-        where('checkIn', '<=', today),
-        where('checkOut', '>=', thirtyDaysStart),
-        orderBy('checkIn', 'asc'),
-      ),
-      (snapshot) => {
-        setRangeBookings(
-          snapshot.docs.map((document) => mapBookingFromDb(document.id, document.data() as DbBooking)),
-        )
-        ready.range = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setRangeBookings([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu công suất phòng.' })
-        ready.range = true
-        finishIfReady()
-      },
-    )
-
-    const unsubMonthRevenue = onSnapshot(
-      query(
-        collection(db, 'revenue_items'),
-        where('date', '>=', monthStart),
-        where('date', '<=', monthEnd),
-      ),
-      (snapshot) => {
-        setMonthRevenue(
-          snapshot.docs.map((document) => mapRevenueItemFromDb(document.id, document.data() as DbRevenueItem)),
-        )
-        ready.revenue = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setMonthRevenue([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu doanh thu.' })
-        ready.revenue = true
-        finishIfReady()
-      },
-    )
-
-    const unsubMonthExpenses = onSnapshot(
-      query(
-        collection(db, 'expenses'),
-        where('date', '>=', monthStart),
-        where('date', '<=', monthEnd),
-      ),
-      (snapshot) => {
-        setMonthExpenses(
-          snapshot.docs.map((document) => mapExpenseItemFromDb(document.id, document.data() as DbExpenseItem)),
-        )
-        ready.expenses = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setMonthExpenses([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu chi phí.' })
-        ready.expenses = true
-        finishIfReady()
-      },
-    )
-
-    const unsubUnpaidRevenue = onSnapshot(
-      query(collection(db, 'revenue_items'), where('status', '==', 'unpaid')),
-      (snapshot) => {
-        setUnpaidRevenue(
-          snapshot.docs.map((document) => mapRevenueItemFromDb(document.id, document.data() as DbRevenueItem)),
-        )
-        ready.unpaid = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setUnpaidRevenue([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải dữ liệu công nợ.' })
-        ready.unpaid = true
-        finishIfReady()
-      },
-    )
-
-    const unsubCheckIns = onSnapshot(
-      query(collection(db, 'bookings'), where('checkIn', '==', today)),
-      (snapshot) => {
-        const items = snapshot.docs.map((document) => ({
-          ...mapBookingFromDb(document.id, document.data() as DbBooking),
-        }))
-
-        setCheckInsToday(sortBookingsByRoom(items))
-        ready.checkIn = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setCheckInsToday([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải danh sách check-in hôm nay.' })
-        ready.checkIn = true
-        finishIfReady()
-      },
-    )
-
-    const unsubCheckOuts = onSnapshot(
-      query(collection(db, 'bookings'), where('checkOut', '==', today)),
-      (snapshot) => {
-        const items = snapshot.docs.map((document) => ({
-          ...mapBookingFromDb(document.id, document.data() as DbBooking),
-        }))
-
-        setCheckOutsToday(sortBookingsByRoom(items))
-        ready.checkOut = true
-        finishIfReady()
-      },
-      (snapshotError) => {
-        console.error(snapshotError)
-        setCheckOutsToday([])
-        dispatch({ type: 'ERROR', message: 'Không thể tải danh sách check-out hôm nay.' })
-        ready.checkOut = true
-        finishIfReady()
-      },
-    )
+    void fetchOverviewData()
 
     return () => {
-      unsubRangeBookings()
-      unsubMonthRevenue()
-      unsubMonthExpenses()
-      unsubUnpaidRevenue()
-      unsubCheckIns()
-      unsubCheckOuts()
+      cancelled = true
     }
-  }, [monthEnd, monthStart, thirtyDaysStart, today])
+  }, [monthEnd, monthStart, reloadTick, thirtyDaysStart, today])
+
+  const checkInsToday = useMemo(
+    () => sortBookingsByRoom(overviewData.rangeBookings.filter((booking) => booking.checkIn === today)),
+    [overviewData.rangeBookings, today],
+  )
+
+  const checkOutsToday = useMemo(
+    () => sortBookingsByRoom(overviewData.rangeBookings.filter((booking) => booking.checkOut === today)),
+    [overviewData.rangeBookings, today],
+  )
 
   const occupancySeries = useMemo(() => {
     const dates = eachDayOfInterval({
@@ -270,7 +193,7 @@ export function useOverviewData(): UseOverviewDataResult {
     return dates.map((date) => {
       const day = format(date, 'yyyy-MM-dd')
       const occupiedRooms = new Set(
-        rangeBookings
+        overviewData.rangeBookings
           .filter((booking) => isActiveBooking(booking) && includesDate(booking, day))
           .map((booking) => booking.roomId),
       ).size
@@ -282,28 +205,29 @@ export function useOverviewData(): UseOverviewDataResult {
         occupancyRate: Number(((occupiedRooms / TOTAL_ROOMS) * 100).toFixed(1)),
       }
     })
-  }, [rangeBookings, today, thirtyDaysStart])
+  }, [overviewData.rangeBookings, thirtyDaysStart, today])
 
   const metrics = useMemo<OverviewMetrics>(() => {
     const todayOccupied = new Set(
-      rangeBookings
+      overviewData.rangeBookings
         .filter((booking) => isActiveBooking(booking) && includesDate(booking, today))
         .map((booking) => booking.roomId),
     ).size
 
-    const revenueTodayPaid = monthRevenue
+    const revenueTodayPaid = overviewData.monthRevenue
       .filter((item) => item.date === today && item.status === 'paid')
       .reduce((sum, item) => sum + revenueTotal(item), 0)
 
-    const revenueMonthPaid = monthRevenue
+    const revenueMonthPaid = overviewData.monthRevenue
       .filter((item) => item.status === 'paid')
       .reduce((sum, item) => sum + revenueTotal(item), 0)
 
-    const expenseMonth = monthExpenses.reduce(
+    const expenseMonth = overviewData.monthExpenses.reduce(
       (sum, item) => sum + Number(item.amount || 0),
       0,
     )
 
+    const unpaidRevenue = overviewData.monthRevenue.filter((item) => item.status === 'unpaid')
     const unpaidTotal = unpaidRevenue.reduce((sum, item) => sum + revenueTotal(item), 0)
 
     return {
@@ -316,7 +240,7 @@ export function useOverviewData(): UseOverviewDataResult {
       unpaidTotal,
       unpaidCount: unpaidRevenue.length,
     }
-  }, [monthExpenses, monthRevenue, rangeBookings, today, unpaidRevenue])
+  }, [overviewData.monthExpenses, overviewData.monthRevenue, overviewData.rangeBookings, today])
 
   const revenueBreakdown = useMemo<RevenueBreakdownItem[]>(() => {
     const grouped: Record<RevenueCategory, number> = {
@@ -327,7 +251,7 @@ export function useOverviewData(): UseOverviewDataResult {
       other: 0,
     }
 
-    monthRevenue
+    overviewData.monthRevenue
       .filter((item) => item.status === 'paid')
       .forEach((item) => {
         grouped[item.category] += revenueTotal(item)
@@ -338,7 +262,7 @@ export function useOverviewData(): UseOverviewDataResult {
       label: revenueCategoryLabels[category],
       amount: grouped[category],
     }))
-  }, [monthRevenue])
+  }, [overviewData.monthRevenue])
 
   return {
     loading,
@@ -349,5 +273,8 @@ export function useOverviewData(): UseOverviewDataResult {
     checkInsToday,
     checkOutsToday,
     today,
+    refetch: () => {
+      setReloadTick((current) => current + 1)
+    },
   }
 }

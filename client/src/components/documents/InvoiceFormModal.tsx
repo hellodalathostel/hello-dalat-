@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import type { Booking, Invoice } from '../../types'
 import { buildLineItems } from '../../utils/buildLineItems.js'
+import { formatMoney } from '../../utils/formatVND.js'
 
 export interface InvoiceLineItemForm {
   description: string
@@ -34,10 +35,6 @@ interface InvoiceFormModalProps {
   onClose: () => void
   onPreview: (draft: InvoiceDraftInput) => Promise<void> | void
   onSave: (draft: InvoiceDraftInput, options: { openAfterSave: boolean }) => Promise<void> | void
-}
-
-function toVnd(value: number): string {
-  return `${Math.max(0, value || 0).toLocaleString('vi-VN')} đ`
 }
 
 function toLineItem(description: string, quantity: number, unitPrice: number): InvoiceLineItemForm {
@@ -321,10 +318,10 @@ export default function InvoiceFormModal({
         </div>
 
         <div className="mt-4 rounded-xl bg-[#faf8f1] p-3 text-sm text-slate-700">
-          <p>Tam tinh: {toVnd(draft.subtotal)}</p>
-          <p>Giam gia: -{toVnd(draft.discount)}</p>
-          <p>Phi the: +{toVnd(draft.cardFeeAmount)}</p>
-          <p className="mt-1 font-semibold text-primary">Tong cong: {toVnd(draft.total)}</p>
+          <p>Tam tinh: {formatMoney(draft.subtotal)}</p>
+          <p>Giam gia: -{formatMoney(draft.discount)}</p>
+          <p>Phi the: +{formatMoney(draft.cardFeeAmount)}</p>
+          <p className="mt-1 font-semibold text-primary">Tong cong: {formatMoney(draft.total)}</p>
         </div>
 
         <label className="mt-4 block space-y-1 text-sm text-slate-600">

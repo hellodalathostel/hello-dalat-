@@ -4,6 +4,10 @@ import { db } from '../firebase'
 import { buildLineItems } from '../utils/buildLineItems.js'
 import { mapRevenueItemToDb } from '../utils/firestoreMappers'
 
+interface EnsureRevenueItemsOptions {
+  skipExistingLookup?: boolean
+}
+
 function normalizeCategory(label: string) {
   const lowered = label.toLowerCase()
   if (lowered.includes('breakfast') || lowered.includes('điểm tâm')) {
@@ -21,13 +25,18 @@ function normalizeCategory(label: string) {
   return 'other' as const
 }
 
-export async function ensureRevenueItemsForBooking(booking: Booking) {
-  const existingSnapshot = await getDocs(
-    query(collection(db, 'revenue_items'), where('booking_id', '==', booking.id)),
-  )
+export async function ensureRevenueItemsForBooking(
+  booking: Booking,
+  options: EnsureRevenueItemsOptions = {},
+) {
+  const existingSnapshot = options.skipExistingLookup
+    ? null
+    : await getDocs(
+        query(collection(db, 'revenue_items'), where('booking_id', '==', booking.id)),
+      )
 
   const existingKeys = new Set(
-    existingSnapshot.docs.map((item) => {
+    (existingSnapshot?.docs || []).map((item) => {
       const data = item.data() as { category?: string; description?: string }
       return `${data.category || ''}::${data.description || ''}`
     }),

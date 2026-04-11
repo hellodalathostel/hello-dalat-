@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { useGroupBookings } from '../hooks/useGroupBookings'
 import type { Booking } from '../types'
+import { formatMoney } from '../utils/formatVND.js'
 
 const BREAKFAST_PRICE = 35000
 
@@ -36,10 +37,6 @@ function makeRoomRow(defaultDate: string): GroupRoomRow {
     guests: 1,
     breakfastIncluded: false,
   }
-}
-
-function toVnd(value: number) {
-  return `${value.toLocaleString('vi-VN')} đ`
 }
 
 function toNights(checkIn: string, checkOut: string) {
@@ -301,7 +298,7 @@ export default function GroupBookingsPage() {
 
                       <div className="flex items-end justify-between gap-2 md:col-span-1">
                         <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-right text-sm font-semibold text-emerald-700">
-                          {toVnd(row.subtotal)}
+                          {formatMoney(row.subtotal)}
                         </div>
                         <button
                           type="button"
@@ -323,9 +320,9 @@ export default function GroupBookingsPage() {
                         Thêm breakfast (35,000 đ/người/đêm)
                       </label>
                       <span>Số đêm: {row.nights}</span>
-                      <span>Giá phòng/đêm: {toVnd(row.roomRate)}</span>
-                      {row.breakfastIncluded ? <span>Breakfast: {toVnd(row.breakfastSubtotal)}</span> : null}
-                      <span>Tạm tính: {toVnd(row.subtotal)}</span>
+                      <span>Giá phòng/đêm: {formatMoney(row.roomRate)}</span>
+                      {row.breakfastIncluded ? <span>Breakfast: {formatMoney(row.breakfastSubtotal)}</span> : null}
+                      <span>Tạm tính: {formatMoney(row.subtotal)}</span>
                     </div>
 
                     {hasDuplicate ? (
@@ -359,13 +356,13 @@ export default function GroupBookingsPage() {
                     <span>
                       {row.roomLabel} • {row.checkIn} → {row.checkOut}
                     </span>
-                    <span className="font-semibold">{toVnd(row.subtotal)}</span>
+                    <span className="font-semibold">{formatMoney(row.subtotal)}</span>
                   </div>
                 ))}
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-primary/10 pt-3 text-base font-semibold text-slate-900">
                 <span>Tổng cộng</span>
-                <span>{toVnd(grandTotal)}</span>
+                <span>{formatMoney(grandTotal)}</span>
               </div>
             </div>
 

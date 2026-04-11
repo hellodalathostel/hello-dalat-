@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db } from '../../firebase'
 import { ensureRevenueItemsForBooking } from '../../services/revenueSync'
 import type { Booking, ServiceItem } from '../../types'
+import { formatMoney } from '../../utils/formatVND.js'
 
 const roomOptions = [
   { value: '101', label: '101 - Family' },
@@ -88,10 +89,6 @@ interface BookingFormState {
   status: Booking['status']
   breakfastIncluded: boolean
   notes: string
-}
-
-function toVnd(value: number) {
-  return `${value.toLocaleString('vi-VN')} đ`
 }
 
 function createServiceItem(): ServiceItem {
@@ -442,11 +439,14 @@ export default function BookingForm({
 
         if (payload.status === 'checkedout' || payload.paymentStatus === 'paid') {
           try {
-            await ensureRevenueItemsForBooking({
-              ...(payload as Omit<Booking, 'id' | 'createdAt'>),
-              id: created.id,
-              createdAt: now,
-            } as Booking)
+            await ensureRevenueItemsForBooking(
+              {
+                ...(payload as Omit<Booking, 'id' | 'createdAt'>),
+                id: created.id,
+                createdAt: now,
+              } as Booking,
+              { skipExistingLookup: true },
+            )
           } catch (syncError) {
             console.error(syncError)
             setError('Booking da luu, nhung khong the dong bo doanh thu tu dong.')
@@ -645,7 +645,7 @@ export default function BookingForm({
             }}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
-          <p className="text-xs text-slate-500">{toVnd(formState.roomRate)}</p>
+          <p className="text-xs text-slate-500">{formatMoney(formState.roomRate)}</p>
         </label>
 
         <section className="space-y-3 rounded-xl border border-slate-200 bg-[#fffdf8] p-3">
@@ -704,7 +704,7 @@ export default function BookingForm({
                     />
                   </div>
                   <div className="flex items-center justify-between md:col-span-3 md:justify-end md:gap-2">
-                    <span className="text-xs font-medium text-slate-700">= {toVnd(service.total)}</span>
+                    <span className="text-xs font-medium text-slate-700">= {formatMoney(service.total)}</span>
                     <button
                       type="button"
                       onClick={() => removeServiceRow(service.id)}
@@ -725,7 +725,7 @@ export default function BookingForm({
           </datalist>
 
           <p className="text-sm font-medium text-slate-700">
-            Tổng dịch vụ: <span className="font-semibold text-slate-900">{toVnd(servicesTotal)}</span>
+            Tổng dịch vụ: <span className="font-semibold text-slate-900">{formatMoney(servicesTotal)}</span>
           </p>
         </section>
 
@@ -768,20 +768,20 @@ export default function BookingForm({
           <div className="mt-2 rounded-xl border border-slate-200 bg-[#fffdf8] px-3 py-3 text-sm text-slate-700">
             <div className="flex items-center justify-between">
               <span>Tiền phòng:</span>
-              <span>{toVnd(roomSubtotal)}</span>
+              <span>{formatMoney(roomSubtotal)}</span>
             </div>
 
             {servicesTotal > 0 ? (
               <div className="mt-1 flex items-center justify-between">
                 <span>Dịch vụ:</span>
-                <span>{toVnd(servicesTotal)}</span>
+                <span>{formatMoney(servicesTotal)}</span>
               </div>
             ) : null}
 
             {formState.discount > 0 ? (
               <div className="mt-1 flex items-center justify-between text-red-600">
                 <span>Giảm giá:</span>
-                <span>-{toVnd(formState.discount)}</span>
+                <span>-{formatMoney(formState.discount)}</span>
               </div>
             ) : null}
 
@@ -789,23 +789,23 @@ export default function BookingForm({
 
             <div className="flex items-center justify-between">
               <span>Tổng cộng:</span>
-              <span>{toVnd(formState.totalAmount)}</span>
+              <span>{formatMoney(formState.totalAmount)}</span>
             </div>
 
             <div className="mt-1 flex items-center justify-between">
               <span>Đã cọc:</span>
-              <span>-{toVnd(formState.depositPaid)}</span>
+              <span>-{formatMoney(formState.depositPaid)}</span>
             </div>
 
             <div className="mt-1 flex items-center justify-between">
               <span>Còn lại:</span>
-              <span>{toVnd(remainingAmount)}</span>
+              <span>{formatMoney(remainingAmount)}</span>
             </div>
 
             {formState.paymentMethod === 'card' ? (
               <div className="mt-1 flex items-center justify-between">
                 <span>Phí thẻ (4%):</span>
-                <span>+{toVnd(cardFee)}</span>
+                <span>+{formatMoney(cardFee)}</span>
               </div>
             ) : null}
 
@@ -813,7 +813,7 @@ export default function BookingForm({
 
             <div className="flex items-center justify-between font-semibold text-primary">
               <span>Khách thanh toán:</span>
-              <span>{toVnd(grandTotal)}</span>
+              <span>{formatMoney(grandTotal)}</span>
             </div>
           </div>
         </label>
@@ -827,7 +827,7 @@ export default function BookingForm({
             onChange={(event) => updateState('depositPaid', Math.max(0, Number(event.target.value) || 0))}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
-          <p className="text-xs text-slate-500">{toVnd(formState.depositPaid)}</p>
+          <p className="text-xs text-slate-500">{formatMoney(formState.depositPaid)}</p>
         </label>
 
         <p className="rounded-xl bg-[#faf8f1] px-3 py-2 text-sm text-slate-600">
